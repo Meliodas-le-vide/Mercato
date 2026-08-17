@@ -1,127 +1,92 @@
+
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mercato_app/core/constants/api_constants.dart';
 import 'package:mercato_app/features/auth/data/models/user_model.dart';
+import 'package:mercato_app/services/api_client.dart';
 
 
 class AuthService {
+  final ApiClient _api = ApiClient();
   final _storage = const FlutterSecureStorage();
 
-  //Clés de stockage
-  static const String _tokenKey = 'jwt_token';
-  static const String _userKey = 'user_data';
-
-  //Inscription
   Future<Map<String, dynamic>> register({
-    required String firstName,
-    required String lastName,
+    required String firstname,
+    required String lastname,
     required String email,
-    required String phone,
     required String password,
-    required String role,
+    required String role, 
+    String? phone,
   }) async {
+    final response = await _api.dio.post(ApiConstants.register, data: {
+      'firstname': firstname,
+      'lastname': lastname,
+      'email': email,
+      'password': password,
+      'role': role,
+      'phone': phone,
+    });
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> login(String email, String password) async {
+    final response = await _api.dio.post(ApiConstants.login, data: {
+      'email': email,
+      'password': password,
+    });
+
+    final data = response.data;
+    await _storage.write(key: 'accessToken', value: data['accessToken']);
+    await _storage.write(key: 'refreshToken', value: data['refreshToken']);
+    await _storage.write(key: 'userRole', value: data['user']['role']);
+    // await _storage.write(key: 'userData', value: jsonEncode(data['user']));
+    return data;
+  }
+
+  Future<void> logout() async {
+    final refreshToken = await _storage.read(key: 'refreshToken');
     try {
-      final response = await http.post(
-        Uri.parse(ApiConstants.register),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'firstname': firstName,
-          'lastname': lastName,
-          'email': email,
-          'phone': phone,
-          'password': password,
-          'role': role,
-        }),
-      );
+      await _api.dio.post(ApiConstants.logout, data: {'refreshToken': refreshToken});
+    } catch (_) {}
+    await _storage.deleteAll();
+  }
 
-      final data = jsonDecode(response.body);
+  Future<bool> isLoggedIn() async {
+    final token = await _storage.read(key: 'accessToken');
+    return token != null;
+  }
 
-      if (response.statusCode == 201) {
-        return {'success': true, 'message': 'Compte créé avec succès'};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Erreur lors de l\'inscription',
-        };
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Impossible de contacter le serveur'};
+  Future<String?> getUserRole() async {
+    return await _storage.read(key: 'userRole');
+  }
+
+    Future<bool> tryRefresh() async {
+    try {
+      final refreshToken = await _storage.read(key: 'refreshToken');
+      if (refreshToken == null) return false;
+
+      final response = await _api.dio.post('/auth/refresh-token', data: {
+        'refreshToken': refreshToken,
+      });
+
+      await _storage.write(key: 'accessToken', value: response.data['accessToken']);
+      await _storage.write(key: 'refreshToken', value: response.data['refreshToken']);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
-  //Connexion
-  Future<Map<String, dynamic>> login({
-    required String email,
-    required String password,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse(ApiConstants.login),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
-      );
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        //Sauvegarde du token
-        if (data['accessToken'] != null) {
-          await _storage.write(key: _tokenKey, value: data['accessToken']);
-        }
-
-        //Sauvegarde et parsing de l'utilisateur
-        UserModel? user;
-        if (data['user'] != null) {
-          user = UserModel.fromJson(data['user']);
-          await _storage.write(
-            key: _userKey,
-            value: jsonEncode(user.toJson()),
-          );
-        }
-
-        return {
-          'success': true,
-          'user': user,
-          'token': data['accessToken'],
-        };
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Identifiants incorrects',
-        };
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Impossible de contacter le serveur'};
-    }
+  Future<void> clearSession() async {
+    await _storage.deleteAll();
   }
 
-  //Récupérer le token stocké
-  Future<String?> getToken() async {
-    return await _storage.read(key: _tokenKey);
+  // Stocke le user en JSON pour le retrouver après un redémarrage de l'app
+  Future<UserModel?> getStoredUser() async {
+    final raw = await _storage.read(key: 'userData');
+    if (raw == null) return null;
+    return UserModel.fromJson(jsonDecode(raw));
   }
   
-
-  //Récupérer l'utilisateur connecté 
-  Future<UserModel?> getCurrentUser() async {
-    try {
-      final userStr = await _storage.read(key: _userKey);
-      if (userStr != null) {
-        final Map<String, dynamic> userMap = jsonDecode(userStr);
-        return UserModel.fromJson(userMap);
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  //Déconnexion
-  Future<void> logout() async {
-    await _storage.delete(key: _tokenKey);
-    await _storage.delete(key: _userKey);
-  }
 }

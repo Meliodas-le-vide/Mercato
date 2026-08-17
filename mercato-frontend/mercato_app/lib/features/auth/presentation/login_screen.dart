@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mercato_app/core/constants/app_color.dart';
-import 'package:mercato_app/features/auth/providers/auth_provider.dart';
-import 'package:provider/provider.dart';
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,31 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isPasswordObscured = true;
 
-  
-  void _handleLogin() async {
-  if (_formKey.currentState!.validate()) {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    final success = await authProvider.login(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-    );
-
-    if (!mounted) return;
-
-    if (success) {
-      // La redirection vers l'écran principal se fait automatiquement grâce au Consumer dans main.dart
-     Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.errorMessage ?? 'Erreur de connexion'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-}
 
 
   @override
@@ -191,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 //Bouton Se connecter
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _handleLogin,
+                  onPressed: (){},
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.black,
@@ -201,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                  child: _isLoading
-                  ? const CircularProgressIndicator(color: AppColors.primary):
+                  ? const CircularProgressIndicator(color: AppColors.lightBackground):
                    const Text(
                     'SE CONNECTER',
                     style: TextStyle(
@@ -224,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     GestureDetector(
                       onTap: () {
-                        Navigator.pushReplacementNamed(context, '/register');
+                       
                       },
                       child: const Text(
                         'S\'inscrire',

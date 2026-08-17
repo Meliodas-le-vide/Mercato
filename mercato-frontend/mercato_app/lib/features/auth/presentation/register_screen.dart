@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mercato_app/core/constants/app_color.dart';
-import 'package:mercato_app/features/auth/data/auth_service.dart'; 
+
 
 class RegisterScreen extends StatefulWidget {
   final String role; 
@@ -13,8 +13,6 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
 
-  // Ajoute la déclaration dans la classe d'état de ton formulaire :
-  final AuthService _authService = AuthService();
   bool _isLoading = false;
 
 
@@ -26,38 +24,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   bool _isPasswordObscured = true;
 
-
-
-// Implémente la méthode _submitForm :
-void _submitForm() async {
-  if (_formKey.currentState!.validate()) {
-    setState(() => _isLoading = true);
-
-    final result = await _authService.register(
-      firstName: _firstnameController.text.trim(),
-      lastName: _lastnameController.text.trim(),
-      email: _emailController.text.trim(),
-      phone: _phoneController.text.trim(),
-      password: _passwordController.text,
-      role: widget.role,
-    );
-
-    setState(() => _isLoading = false);
-
-    if (!mounted) return;
-
-    if (result['success']) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
-      );
-      Navigator.pushReplacementNamed(context, '/login');
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
-      );
-    }
-  }
-}
 
   @override
   void dispose() {
@@ -243,7 +209,7 @@ void _submitForm() async {
                 const SizedBox(height: 30),
 
                 ElevatedButton(
-                 onPressed: _isLoading ? null : _submitForm,
+                 onPressed: (){},
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.black,
@@ -253,7 +219,7 @@ void _submitForm() async {
                     ),
                   ),
                   child: _isLoading
-                  ? const CircularProgressIndicator(color: AppColors.primary):
+                  ? const CircularProgressIndicator(color: AppColors.lightBackground):
                   const Text(
                     'CRÉER MON COMPTE',
                     style: TextStyle(
@@ -276,7 +242,7 @@ void _submitForm() async {
                     ),
                     GestureDetector(
                       onTap: () {
-                        Navigator.pushReplacementNamed(context, '/login');
+                        
                       },
                       child: const Text(
                         'Se connecter',

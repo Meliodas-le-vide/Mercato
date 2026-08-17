@@ -1,108 +1,134 @@
+// lib/features/auth/providers/auth_provider.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:mercato_app/features/auth/data/auth_service.dart';
 import 'package:mercato_app/features/auth/data/models/user_model.dart';
 
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
+  final _storage = const FlutterSecureStorage();
 
-  UserModel? _user;
+  bool _isCheckingAuth = true;
+  bool _isAuthenticated = false;
   bool _isLoading = false;
-  bool _isCheckingAuth = true; //Utilisé au démarrage de l'app (Splash Screen)
   String? _errorMessage;
+  UserModel? _user;
 
-  //Getters pour consommer l'état dans l'UI
-  UserModel? get user => _user;
-  bool get isLoading => _isLoading;
   bool get isCheckingAuth => _isCheckingAuth;
-  bool get isAuthenticated => _user != null;
+  bool get isAuthenticated => _isAuthenticated;
+  bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  UserModel? get user => _user;
 
-  //Vérifie la présence d'une session au lancement de l'application
+  /// Appelé au démarrage de l'app (voir main.dart)
   Future<void> checkAuthStatus() async {
     _isCheckingAuth = true;
     notifyListeners();
 
     try {
-      final token = await _authService.getToken();
-      if (token != null) {
-        _user = await _authService.getCurrentUser();
+      final accessToken = await _storage.read(key: 'accessToken');
+
+      if (accessToken == null) {
+        _isAuthenticated = false;
+      } else if (JwtDecoder.isExpired(accessToken)) {
+        // access token expiré -> on tente un refresh silencieux
+        final refreshed = await _authService.tryRefresh();
+        if (refreshed) {
+          await _loadUserFromStorage();
+          _isAuthenticated = true;
+        } else {
+          await _authService.clearSession();
+          _isAuthenticated = false;
+        }
       } else {
-        _user = null;
+        await _loadUserFromStorage();
+        _isAuthenticated = true;
       }
     } catch (e) {
-      _user = null;
-    } finally {
-      _isCheckingAuth = false;
-      notifyListeners();
+      _isAuthenticated = false;
+    }
+
+    _isCheckingAuth = false;
+    notifyListeners();
+  }
+
+  Future<void> _loadUserFromStorage() async {
+    final userJson = await _authService.getStoredUser();
+    if (userJson != null) {
+      _user = userJson;
     }
   }
 
-  //Inscription d'un nouvel utilisateur
+  Future<bool> login(String email, String password) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final data = await _authService.login(email, password);
+      _user = UserModel.fromJson(data['user']);
+      _isAuthenticated = true;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = _extractErrorMessage(e);
+      _isAuthenticated = false;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> register({
-    required String firstName,
-    required String lastName,
+    required String firstname,
+    required String lastname,
     required String email,
-    required String phone,
     required String password,
     required String role,
+    String? phone,
   }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
-    final result = await _authService.register(
-      firstName: firstName,
-      lastName: lastName,
-      email: email,
-      phone: phone,
-      password: password,
-      role: role,
-    );
-
-    _isLoading = false;
-
-    if (result['success']) {
+    try {
+      await _authService.register(
+        firstname: firstname,
+        lastname: lastname,
+        email: email,
+        password: password,
+        role: role,
+        phone: phone,
+      );
+      _isLoading = false;
       notifyListeners();
       return true;
-    } else {
-      _errorMessage = result['message'];
+    } catch (e) {
+      _errorMessage = _extractErrorMessage(e);
+      _isLoading = false;
       notifyListeners();
       return false;
     }
   }
 
-  //Connexion de l'utilisateur
-  Future<bool> login({
-    required String email,
-    required String password,
-  }) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    final result = await _authService.login(
-      email: email,
-      password: password,
-    );
-
-    _isLoading = false;
-
-    if (result['success']) {
-      _user = result['user'];
-      notifyListeners();
-      return true;
-    } else {
-      _errorMessage = result['message'];
-      notifyListeners();
-      return false;
-    }
-  }
-
-  //Deconnexion
   Future<void> logout() async {
     await _authService.logout();
     _user = null;
+    _isAuthenticated = false;
     notifyListeners();
+  }
+
+  String _extractErrorMessage(dynamic e) {
+    
+    try {
+      final response = (e as dynamic).response;
+      if (response != null && response.data['message'] != null) {
+        return response.data['message'];
+      }
+    } catch (_) {}
+    return 'Une erreur est survenue. Veuillez réessayer.';
   }
 }

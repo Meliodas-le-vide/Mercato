@@ -3,14 +3,14 @@ import 'package:mercato_app/core/constants/app_color.dart';
 
 
 class AppTheme {
-  // --- THÈME SOMBRE (Thème principal de la maquette) ---
+  
   static ThemeData get darkTheme {
     return ThemeData(
       brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.darkBackground,
       primaryColor: AppColors.primary,
       
-      // Palette de couleurs globale 
+     
       colorScheme: const ColorScheme.dark(
         primary: AppColors.primary,
         surface: AppColors.darkSurface,
@@ -19,7 +19,7 @@ class AppTheme {
         onSurface: AppColors.textPrimaryDark,
       ),
 
-      // Style des cartes (Player cards, Feed)
+     
       cardTheme: CardThemeData(
         color: AppColors.darkSurface,
         elevation: 0,
@@ -28,7 +28,7 @@ class AppTheme {
         ),
       ),
 
-      // Style des champs de texte (Formulaires / Inscription)
+     
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.darkInput,
@@ -43,11 +43,11 @@ class AppTheme {
         ),
       ),
 
-      // Style des boutons principaux
+     
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
-          foregroundColor: Colors.black, // Texte en noir sur fond vert
+          foregroundColor: Colors.black, 
           textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -56,7 +56,7 @@ class AppTheme {
         ),
       ),
 
-      // Bottom Navigation Bar
+   
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.darkSurface,
         selectedItemColor: AppColors.primary,
@@ -66,7 +66,7 @@ class AppTheme {
     );
   }
 
-  // --- THÈME CLAIR (Optionnel) ---
+ 
   static ThemeData get lightTheme {
     return ThemeData(
       brightness: Brightness.light,

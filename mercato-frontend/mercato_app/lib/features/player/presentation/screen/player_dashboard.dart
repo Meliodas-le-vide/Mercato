@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:mercato_app/features/auth/providers/auth_provider.dart';
-import 'package:provider/provider.dart';
+
 
 
 class PlayerDashboard extends StatelessWidget {
@@ -8,7 +7,7 @@ class PlayerDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthProvider>().user;
+   
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B141B),
@@ -36,7 +35,7 @@ class PlayerDashboard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Salut, ${user?.firstname ?? "Joueur"} ⚽',
+              'Salut,',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 22,

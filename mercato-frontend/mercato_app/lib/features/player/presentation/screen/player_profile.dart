@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mercato_app/features/player/presentation/widgets/player_profile_form.dart';
-import 'package:provider/provider.dart';
-import 'package:mercato_app/features/auth/providers/auth_provider.dart';
+
 
 
 class PlayerProfile extends StatelessWidget {
@@ -13,8 +12,7 @@ class PlayerProfile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final user = authProvider.user;
+
 
     return Scaffold(
       backgroundColor: darkBg,
@@ -36,12 +34,12 @@ class PlayerProfile extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              '${user?.firstname ?? "Joueur"} ${user?.lastname ?? ""}',
+              'Nom Prénom',
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             const SizedBox(height: 8),
             Text(
-              user?.email ?? '',
+              'email',
               style: const TextStyle(color: Colors.white54, fontSize: 14),
             ),
             const SizedBox(height: 32),
@@ -82,10 +80,7 @@ class PlayerProfile extends StatelessWidget {
                 icon: const Icon(Icons.logout),
                 label: const Text('Se déconnecter'),
                 onPressed: () async {
-                  await authProvider.logout();
-                  if (context.mounted) {
-                    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-                  }
+                
                 },
               ),
             ),
