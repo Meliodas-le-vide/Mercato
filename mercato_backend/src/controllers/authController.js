@@ -64,8 +64,12 @@ exports.login = async (req, res) => {
       refreshToken,
       user: {
         id: user.id,
+        lastname: user.lastname,
+        firstname: user.firstname,
         email: user.email,
-        role: user.role
+        role: user.role,
+        phone: user.phone,
+        ProfileImage: user.Profile_image
       }
     });
   } catch (error) {
@@ -155,3 +159,5 @@ exports.logout = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+
