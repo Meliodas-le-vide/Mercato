@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mercato_frontend/config/routes/app_routes.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/network/dio_client.dart';
 import '../data/auth_repository.dart';
@@ -56,14 +57,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Compte créé ! Veuillez vous connecter.')),
+        const SnackBar(
+          content: Text('Compte créé ! Veuillez vous connecter.', style: TextStyle(color: Colors.white),),
+          backgroundColor: AppColors.success,
+          ),
       );
 
-      Navigator.pushReplacementNamed(context, '/login', arguments: _activeRole);
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.login,
+        (route) => false, // Nettoie le tunnel d'inscription
+        arguments: _activeRole,
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erreur lors de l\'inscription')),
+        const SnackBar(content: Text('Erreur lors de l\'inscription',style: TextStyle(color: Colors.white),),backgroundColor: AppColors.error,),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -106,17 +115,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Navigation Connexion / Inscription
+                   
                       Row(
                         children: [
                           Expanded(
                             child: GestureDetector(
                               onTap: () {
-                                Navigator.pushReplacementNamed(
-                                  context,
-                                  '/login',
-                                  arguments: _activeRole,
-                                );
+                               Navigator.pushNamedAndRemoveUntil(
+                                context,
+                                AppRoutes.login,
+                                (route) => false,
+                                arguments: _activeRole,
+                              );
                               },
                               child: Column(
                                 children: [

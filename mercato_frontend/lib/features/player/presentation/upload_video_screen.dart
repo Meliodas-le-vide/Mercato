@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mercato_frontend/core/network/dio_client.dart';
-import 'package:mercato_frontend/features/feed/data/video_repository.dart';
+import 'package:mercato_frontend/features/user/data/video_repository.dart';
 
 class PlayerUploadScreen extends StatefulWidget {
   const PlayerUploadScreen({super.key});

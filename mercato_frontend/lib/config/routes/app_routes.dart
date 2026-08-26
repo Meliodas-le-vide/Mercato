@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:mercato_frontend/features/auth/presentation/onboarding_screen.dart';
-import 'package:mercato_frontend/features/feed/domain/video_model.dart';
+import 'package:mercato_frontend/features/user/domain/video_model.dart';
 import 'package:mercato_frontend/features/player/presentation/complete_profile_screen.dart';
 import 'package:mercato_frontend/features/player/presentation/edit_profile_Screen.dart';
 import 'package:mercato_frontend/features/player/presentation/help_screen.dart';
 import 'package:mercato_frontend/features/player/presentation/player_Main_screen.dart';
 import 'package:mercato_frontend/features/player/presentation/upload_video_screen.dart';
 import 'package:mercato_frontend/features/player/presentation/video_player_screen.dart';
-import 'package:mercato_frontend/features/player/presentation/view/player_profile_screen.dart';
+import 'package:mercato_frontend/features/player/presentation/player_profile_screen.dart';
+import 'package:mercato_frontend/features/user/presentation/main_screen.dart';
+import 'package:mercato_frontend/features/user/presentation/profile_edit_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/auth/presentation/role_selection_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
@@ -28,6 +30,7 @@ class AppRoutes {
   static const String videoplayer = '/video-player';
   static const String profile = '/player-profile';
   static const String help = '/help'; 
+  static const String edit = '/edit';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -45,6 +48,9 @@ class AppRoutes {
 
       case editProfile:
         return MaterialPageRoute(builder: (_) => const EditProfileScreen());
+
+      case edit:
+        return MaterialPageRoute(builder: (_) => const ProfileEditScreen());  
 
       case profile:
         return MaterialPageRoute(builder: (_) => const PlayerProfileScreen());  
@@ -87,10 +93,7 @@ class AppRoutes {
       case feed:
       default:
         return MaterialPageRoute(
-          builder: (_) => Scaffold(
-            appBar: AppBar(title: const Text('Feed Vidéo')),
-            body: const Center(child: Text('Flux vidéo')),
-          ),
+          builder: (_) => MainScreen()
         );
     }
   }

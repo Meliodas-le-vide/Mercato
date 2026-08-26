@@ -2,13 +2,11 @@ class ApiEndpoints {
  
   static const String baseUrl = 'http://192.168.1.78:5000/api';
 
-
   static const String login = '$baseUrl/auth/login';
   static const String register = '$baseUrl/auth/register';
   static const String logout = '$baseUrl/auth/logout';
   static const String refreshToken = '$baseUrl/auth/refreshToken';
   static const String forgotPassword = '$baseUrl/auth/forgotPassword';
-
 
 
   static const String videoFeed = '$baseUrl/v1/videos/feed';
@@ -26,6 +24,9 @@ class ApiEndpoints {
   static const String videoMyVideos = '$baseUrl/v1/videos/my-videos';
   static const String playerStats = '$baseUrl/v1/players/me/stats';
   static const String playerAnalytics = '$baseUrl/v1/players/me/analytics';
+  static const String playerSearch = '$baseUrl/v1/players/search';
+  static const String favorites = '$baseUrl/v1/favorites';
+  static String favoriteToggle(int playerId) => '$baseUrl/v1/favorites/$playerId';
 
 
 }

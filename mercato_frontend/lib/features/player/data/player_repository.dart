@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:mercato_frontend/features/feed/domain/video_model.dart';
+import 'package:mercato_frontend/features/user/domain/video_model.dart';
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/dio_client.dart';
 import '../domain/player_profile_model.dart';

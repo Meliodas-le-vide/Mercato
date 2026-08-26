@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:mercato_frontend/core/network/dio_client.dart';
-import 'package:mercato_frontend/features/feed/data/video_repository.dart';
-import 'package:mercato_frontend/features/feed/domain/video_comment_model.dart';
-import 'package:mercato_frontend/features/feed/domain/video_model.dart';
+import 'package:mercato_frontend/features/user/data/video_repository.dart';
+import 'package:mercato_frontend/features/user/domain/video_comment_model.dart';
+import 'package:mercato_frontend/features/user/domain/video_model.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final VideoModel video;

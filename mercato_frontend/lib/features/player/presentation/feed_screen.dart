@@ -6,8 +6,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mercato_frontend/config/routes/app_routes.dart';
 import 'package:mercato_frontend/core/network/dio_client.dart';
 import 'package:mercato_frontend/features/auth/domain/user_model.dart';
-import 'package:mercato_frontend/features/feed/data/video_repository.dart';
-import 'package:mercato_frontend/features/feed/domain/video_model.dart';
+import 'package:mercato_frontend/features/user/data/video_repository.dart';
+import 'package:mercato_frontend/features/user/domain/video_model.dart';
 import 'package:mercato_frontend/features/player/data/player_repository.dart';
 import 'package:mercato_frontend/features/player/domain/player_profile_model.dart';
 import 'package:mercato_frontend/features/player/presentation/video_player_screen.dart';
@@ -166,7 +166,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                 : 'Bienvenu, PRÉNOM'),
                         style: const TextStyle(
                           color: darkBlue,
-                          fontSize: 20,
+                          fontSize: 19,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

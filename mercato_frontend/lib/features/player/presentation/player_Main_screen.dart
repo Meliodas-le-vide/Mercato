@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mercato_frontend/config/routes/app_routes.dart';
-import 'package:mercato_frontend/features/player/presentation/view/feed_screen.dart';
+import 'package:mercato_frontend/features/player/presentation/feed_screen.dart';
 
 
 class PlayerMainScreen extends StatefulWidget {

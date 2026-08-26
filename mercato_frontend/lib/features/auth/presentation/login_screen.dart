@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mercato_frontend/config/routes/app_routes.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/network/dio_client.dart';
 import '../data/auth_repository.dart';
@@ -21,43 +22,48 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
   void _handleLogin() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez remplir tous les champs')),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final user = await _authRepository.login(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-
-      if (!mounted) return;
-
-      switch (user.role) {
-        case 'PLAYER':
-          Navigator.pushReplacementNamed(context, '/player-dashboard');
-          break;
-        case 'RECRUITER':
-        case 'CLUB_AGENT':
-          Navigator.pushReplacementNamed(context, '/scouting-search');
-          break;
-        default:
-          Navigator.pushReplacementNamed(context, '/feed');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Identifiants invalides ou erreur réseau')),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Veuillez remplir tous les champs')),
+    );
+    return;
   }
+
+  setState(() => _isLoading = true);
+
+  try {
+    final user = await _authRepository.login(
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+    );
+
+    if (!mounted) return;
+
+    // Détermination de la route cible
+    String targetRoute = AppRoutes.feed;
+    if (user.role == 'PLAYER') {
+      targetRoute = AppRoutes.playerDashboard;
+    } else if (user.role == 'RECRUITER' || user.role == 'CLUB_AGENT') {
+      targetRoute = AppRoutes.scoutingSearch;
+    }
+
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      targetRoute,
+      (route) => false,
+    );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Identifiants invalides',style: TextStyle(color: Colors.white),),
+        backgroundColor: AppColors.error,
+      ),
+    );
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
+  }
+}
 
   @override
   Widget build(BuildContext context) {
