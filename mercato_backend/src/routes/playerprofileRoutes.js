@@ -13,5 +13,6 @@ router.get('/me/videos', verifyToken, playerController.getMyVideos);
 router.get('/me/stats', verifyToken, playerController.getStats);
 router.put('/me/stats', verifyToken, playerController.updateStats);
 router.get('/me/analytics', verifyToken, playerController.getAnalytics);
+router.get('/search', verifyToken, playerController.searchPlayers);
 
 module.exports = router;
