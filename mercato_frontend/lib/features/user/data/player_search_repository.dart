@@ -7,30 +7,26 @@ class PlayerSearchRepository {
 
   PlayerSearchRepository(this._dioClient);
 
-  /// Recherche de joueurs avec filtres optionnels
+  /// Recherche unifiée : sans [query], retourne tous les joueurs
+  /// complets dans un ordre aléatoire (géré côté backend).
+  /// Avec [query], le backend filtre sur prénom OU nom OU poste.
   Future<List<PlayerSearchResult>> search({
-    String? position,
-    String? level,
-    String? city,
-    int? minAge,
-    int? maxAge,
+    String? query,
     int page = 1,
     int limit = 20,
   }) async {
+    final Map<String, dynamic> queryParams = {
+      if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
+      'page': page,
+      'limit': limit,
+    };
+
     final response = await _dioClient.dio.get(
       ApiEndpoints.playerSearch,
-      queryParameters: {
-        if (position != null && position.isNotEmpty) 'position': position,
-        if (level != null && level.isNotEmpty) 'level': level,
-        if (city != null && city.isNotEmpty) 'city': city,
-        if (minAge != null) 'minAge': minAge,
-        if (maxAge != null) 'maxAge': maxAge,
-        'page': page,
-        'limit': limit,
-      },
+      queryParameters: queryParams,
     );
 
-    final List data = response.data['data'];
-    return data.map((json) => PlayerSearchResult.fromJson(json)).toList();
+    final List list = response.data['data'] ?? [];
+    return list.map((json) => PlayerSearchResult.fromJson(json)).toList();
   }
 }

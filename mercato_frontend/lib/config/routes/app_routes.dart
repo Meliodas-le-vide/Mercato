@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mercato_frontend/features/auth/presentation/onboarding_screen.dart';
+import 'package:mercato_frontend/features/user/domain/player_search_result.dart';
 import 'package:mercato_frontend/features/user/domain/video_model.dart';
 import 'package:mercato_frontend/features/player/presentation/complete_profile_screen.dart';
 import 'package:mercato_frontend/features/player/presentation/edit_profile_Screen.dart';
@@ -8,6 +9,7 @@ import 'package:mercato_frontend/features/player/presentation/player_Main_screen
 import 'package:mercato_frontend/features/player/presentation/upload_video_screen.dart';
 import 'package:mercato_frontend/features/player/presentation/video_player_screen.dart';
 import 'package:mercato_frontend/features/player/presentation/player_profile_screen.dart';
+import 'package:mercato_frontend/features/user/presentation/detail_screen.dart' hide PlayerProfileScreen;
 import 'package:mercato_frontend/features/user/presentation/main_screen.dart';
 import 'package:mercato_frontend/features/user/presentation/profile_edit_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
@@ -16,6 +18,8 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 
 class AppRoutes {
+
+
   static const String splash = '/';
   static const String onboarding = '/onboarding';
   static const String roleSelection = '/role-selection';
@@ -31,6 +35,8 @@ class AppRoutes {
   static const String profile = '/player-profile';
   static const String help = '/help'; 
   static const String edit = '/edit';
+  static const String detail = '/player-details';
+  
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -52,6 +58,10 @@ class AppRoutes {
       case edit:
         return MaterialPageRoute(builder: (_) => const ProfileEditScreen());  
 
+      case detail: 
+        final player = settings.arguments as PlayerSearchResult;
+        return MaterialPageRoute(builder: (_) => DetailScreen(player: player));
+        
       case profile:
         return MaterialPageRoute(builder: (_) => const PlayerProfileScreen());  
 

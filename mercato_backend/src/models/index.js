@@ -4,6 +4,7 @@ const PlayerProfile = require('./Playerprofile');
 const Video = require('./Video');
 const VideoLike = require('./Videolike');
 const VideoComment = require('./Videocomment');
+const Favorite = require('./Favorite');
 
 // --- User <-> PlayerProfile (1-to-1) ---
 User.hasOne(PlayerProfile, { foreignKey: 'userId', onDelete: 'CASCADE' });
@@ -25,6 +26,10 @@ VideoComment.belongsTo(Video, { foreignKey: 'videoId' });
 User.hasMany(VideoComment, { foreignKey: 'userId', onDelete: 'CASCADE' });
 VideoComment.belongsTo(User, { foreignKey: 'userId', as: 'author' });
 
+// --- User <-> Favorite (1-to-many) ---
+User.hasMany(Favorite, { foreignKey: 'userId', onDelete: 'CASCADE' });
+Favorite.belongsTo(User, { foreignKey: 'userId' });
+
 module.exports = {
   sequelize,
   User,
@@ -32,4 +37,5 @@ module.exports = {
   Video,
   VideoLike,
   VideoComment,
+  Favorite
 };

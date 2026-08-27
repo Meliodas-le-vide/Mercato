@@ -45,9 +45,8 @@ class _FavorisScreenState extends State<FavorisScreen> {
     }
   }
 
-  // Retire immédiatement la carte de la liste si l'utilisateur la retire des favoris,
-  // sans avoir à recharger tout l'écran.
-  void _handleFavoriteChanged(int playerId, bool isFavorited) {
+  
+  void handleFavoriteChanged(int playerId, bool isFavorited) {
     if (!isFavorited) {
       setState(() => _favorites.removeWhere((p) => p.profile.userId == playerId));
     }
@@ -97,12 +96,12 @@ class _FavorisScreenState extends State<FavorisScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.favorite_border, color: Colors.black26, size: 40),
+              Icon(Icons.favorite_border, color: primaryYellow, size: 100),
               SizedBox(height: 12),
               Text(
-                'Tu n\'as encore ajouté aucun joueur en favori.\nExplore les profils pour en ajouter.',
+                'Vous n\'avez pas encore ajouté aucun joueur en favori.\nExplore les profils pour en ajouter.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.black54, fontSize: 13),
+                style: TextStyle(color: Colors.black54, fontSize: 15),
               ),
             ],
           ),
@@ -121,7 +120,6 @@ class _FavorisScreenState extends State<FavorisScreen> {
           final player = _favorites[index];
           return PlayerResultCard(
             player: player,
-            onFavoriteChanged: (isFavorited) => _handleFavoriteChanged(player.profile.userId, isFavorited),
           );
         },
       ),

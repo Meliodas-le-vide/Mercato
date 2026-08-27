@@ -1,8 +1,6 @@
 import 'package:mercato_frontend/features/auth/domain/user_model.dart';
 import 'package:mercato_frontend/features/player/domain/player_profile_model.dart';
 
-/// Combine un PlayerProfileModel + son UserModel (auteur) + l'état favori,
-/// sans dupliquer les champs déjà présents dans ces deux modèles existants.
 class PlayerSearchResult {
   final PlayerProfileModel profile;
   final UserModel user;
@@ -22,7 +20,6 @@ class PlayerSearchResult {
     );
   }
 
-  /// Calcul dynamique de l'âge à partir du birthDate (YYYY-MM-DD)
   int? get age {
     final birthDate = profile.birthDate;
     if (birthDate == null || birthDate.isEmpty) return null;
@@ -30,7 +27,8 @@ class PlayerSearchResult {
       final birth = DateTime.parse(birthDate);
       final today = DateTime.now();
       int age = today.year - birth.year;
-      if (today.month < birth.month || (today.month == birth.month && today.day < birth.day)) {
+      if (today.month < birth.month ||
+          (today.month == birth.month && today.day < birth.day)) {
         age--;
       }
       return age;
@@ -39,5 +37,5 @@ class PlayerSearchResult {
     }
   }
 
-  String get fullName => '${user.firstname} ${user.lastname}';
+  String get fullName => '${user.firstname} ${user.lastname}'.trim();
 }

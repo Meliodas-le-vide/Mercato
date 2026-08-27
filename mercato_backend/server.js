@@ -3,6 +3,7 @@ const sequelize = require('./config/database');
 const authRoutes = require('./src/routes/authRoutes');
 const playerProfileRoutes = require('./src/routes/playerprofileRoutes');
 const videoRoutes = require('./src/routes/videoRoutes');
+const favoriteRoutes = require('./src/routes/favoriteRoutes');
 cloudinary = require('./config/cloudinary');
 require('dotenv').config();
 
@@ -11,6 +12,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/v1/players', playerProfileRoutes);
 app.use('/api/v1/videos', videoRoutes);
+app.use('/api/v1/favorites', favoriteRoutes);
 
 app.use((err, req, res, next) => {
   console.error('=== Erreur non gérée ===');
