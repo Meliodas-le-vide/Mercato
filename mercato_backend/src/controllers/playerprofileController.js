@@ -54,7 +54,28 @@ exports.updateMe = async (req, res) => {
 
     await profile.save();
 
-    return res.status(200).json({ message: 'Profil mis à jour.', data: profile });
+    // Un simple utilisateur ("fan") qui termine son profil joueur devient
+    // officiellement joueur. On ne touche jamais RECRUITER/CLUB_AGENT/ADMIN :
+    // seul un compte USER peut être promu de cette façon.
+    const user = await User.findByPk(req.user.userId);
+    if (profile.isProfileComplete && user.role === 'USER') {
+      user.role = 'PLAYER';
+      await user.save();
+    }
+
+    return res.status(200).json({
+      message: 'Profil mis à jour.',
+      data: profile,
+      user: {
+        id: user.id,
+        firstname: user.firstname,
+        lastname: user.lastname,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        Profile_image: user.Profile_image,
+      },
+    });
   } catch (error) {
     console.error('Erreur updateMe:', error);
     return res.status(500).json({ error: 'Erreur serveur.' });
@@ -275,12 +296,18 @@ exports.searchPlayers = async (req, res) => {
       ];
     }
 
-    // Tri aléatoire, compatible MySQL et PostgreSQL
+    // Tri aléatoire, compatible MySQL et PostgreSQL.
+    // Avec un `seed` (fourni par le client, stable le temps d'une session de
+    // recherche/pagination), RAND(seed) renvoie le même ordre à chaque page :
+    // sans ça, paginer un tri aléatoire ferait apparaître des doublons et
+    // sauterait des résultats d'une page à l'autre.
     const dialect = sequelize.getDialect();
+    const seed = parseInt(req.query.seed, 10);
+    const hasSeed = !Number.isNaN(seed);
     const randomOrder =
       dialect === 'postgres'
         ? Sequelize.literal('RANDOM()')
-        : Sequelize.literal('RAND()');
+        : Sequelize.literal(hasSeed ? `RAND(${seed})` : 'RAND()');
 
     const { count, rows } = await PlayerProfile.findAndCountAll({
       where,

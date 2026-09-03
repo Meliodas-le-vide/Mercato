@@ -8,7 +8,8 @@ const videoController = require('../controllers/videoController');
 // --- Routes fixes en premier (évite les collisions avec /:id) ---
 router.get('/feed', verifyToken, videoController.getFeed);
 router.post('/upload', verifyToken, uploadVideo.single('video'), videoController.uploadVideo);
-router.get('/my-videos', verifyToken, videoController.getMyVideos); 
+router.get('/my-videos', verifyToken, videoController.getMyVideos);
+router.get('/player/:userId', verifyToken, videoController.getVideosByPlayer);
  
 // --- Routes avec :id ---
 router.get('/:id', verifyToken, videoController.getVideoById);

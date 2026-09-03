@@ -1,7 +1,52 @@
-const { Video, VideoLike, VideoComment, User } = require('../models/index');
+const { Op } = require('sequelize');
+const { Video, VideoLike, VideoComment, User, Favorite, Notification } = require('../models/index');
 const cloudinary = require('../../config/cloudinary');
 
 const PUBLIC_AUTHOR_ATTRS = ['id', 'firstname', 'lastname', 'Profile_image', 'role'];
+
+/**
+ * Ajoute `isLiked` (bool) à une liste de vidéos, calculé pour l'utilisateur courant,
+ * en une seule requête plutôt qu'un aller-retour par vidéo.
+ */
+async function attachIsLiked(videos, userId) {
+  const list = Array.isArray(videos) ? videos : [videos];
+  if (list.length === 0) return Array.isArray(videos) ? [] : videos;
+
+  const likes = await VideoLike.findAll({
+    where: { userId, videoId: { [Op.in]: list.map((v) => v.id) } },
+    attributes: ['videoId'],
+  });
+  const likedIds = new Set(likes.map((l) => l.videoId));
+
+  const withFlag = list.map((v) => {
+    const plain = v.toJSON();
+    plain.isLiked = likedIds.has(v.id);
+    return plain;
+  });
+
+  return Array.isArray(videos) ? withFlag : withFlag[0];
+}
+
+/**
+ * Notifie tous les utilisateurs ayant mis l'auteur de la vidéo en favori.
+ */
+async function notifyFansOfNewVideo(video) {
+  const fans = await Favorite.findAll({ where: { playerId: video.userId } });
+  if (fans.length === 0) return;
+
+  const author = await User.findByPk(video.userId, { attributes: ['firstname', 'lastname'] });
+  const authorName = author ? `${author.firstname} ${author.lastname}`.trim() : 'Un joueur que tu suis';
+
+  await Notification.bulkCreate(
+    fans.map((fan) => ({
+      recipientId: fan.userId,
+      actorId: video.userId,
+      type: 'NEW_VIDEO',
+      videoId: video.id,
+      message: `${authorName} a publié une nouvelle vidéo : "${video.title}"`,
+    })),
+  );
+}
 
 /**
  * GET /api/v1/videos/feed
@@ -30,8 +75,10 @@ exports.getFeed = async (req, res) => {
       include: [{ model: User, as: 'author', attributes: PUBLIC_AUTHOR_ATTRS }],
     });
 
+    const data = await attachIsLiked(rows, req.user.userId);
+
     return res.status(200).json({
-      data: rows,
+      data,
       pagination: {
         total: count,
         page,
@@ -58,7 +105,9 @@ exports.getVideoById = async (req, res) => {
       return res.status(404).json({ error: 'Vidéo introuvable.' });
     }
 
-    return res.status(200).json({ data: video });
+    const data = await attachIsLiked(video, req.user.userId);
+
+    return res.status(200).json({ data });
   } catch (error) {
     console.error('Erreur getVideoById:', error);
     return res.status(500).json({ error: 'Erreur serveur.' });
@@ -213,6 +262,8 @@ exports.uploadVideo = async (req, res) => {
       videoPublicId: req.file.filename,
     });
 
+    await notifyFansOfNewVideo(video);
+
     return res.status(201).json({ message: 'Vidéo publiée avec succès.', data: video });
   } catch (error) {
     console.error('Erreur uploadVideo:', error);
@@ -276,6 +327,48 @@ exports.updateVideo = async (req, res) => {
 
 
 /**
+ * GET /api/v1/videos/player/:userId
+ * Vidéos publiées par un joueur donné, consultables par n'importe quel
+ * utilisateur authentifié (fan, joueur ou recruteur) — permet notamment aux
+ * recruteurs de visionner la vidéothèque d'un joueur repéré via la recherche.
+ */
+exports.getVideosByPlayer = async (req, res) => {
+  try {
+    const targetUserId = parseInt(req.params.userId, 10);
+    if (!Number.isInteger(targetUserId)) {
+      return res.status(400).json({ error: 'Identifiant de joueur invalide.' });
+    }
+
+    const player = await User.findByPk(targetUserId, { attributes: PUBLIC_AUTHOR_ATTRS });
+    if (!player) {
+      return res.status(404).json({ error: 'Joueur introuvable.' });
+    }
+
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const offset = (page - 1) * limit;
+
+    const { count, rows } = await Video.findAndCountAll({
+      where: { userId: targetUserId },
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
+      include: [{ model: User, as: 'author', attributes: PUBLIC_AUTHOR_ATTRS }],
+    });
+
+    const data = await attachIsLiked(rows, req.user.userId);
+
+    return res.status(200).json({
+      data,
+      pagination: { total: count, page, limit, totalPages: Math.ceil(count / limit) },
+    });
+  } catch (error) {
+    console.error('Erreur getVideosByPlayer:', error);
+    return res.status(500).json({ error: 'Erreur serveur lors du chargement des vidéos du joueur.' });
+  }
+};
+
+/**
  * GET /api/v1/videos/my-videos
  * Vidéos du joueur connecté (via le token, pas d'userId dans l'URL -> évite l'IDOR)
  */
@@ -299,8 +392,10 @@ exports.getMyVideos = async (req, res) => {
       ],
     });
 
+    const data = await attachIsLiked(rows, req.user.userId);
+
     return res.status(200).json({
-      data: rows,
+      data,
       pagination: {
         total: count,
         page,

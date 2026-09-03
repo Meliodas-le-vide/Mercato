@@ -2,8 +2,12 @@ const express = require('express');
 const sequelize = require('./config/database');
 const authRoutes = require('./src/routes/authRoutes');
 const playerProfileRoutes = require('./src/routes/playerprofileRoutes');
+const recruiterProfileRoutes = require('./src/routes/recruiterProfileRoutes');
 const videoRoutes = require('./src/routes/videoRoutes');
 const favoriteRoutes = require('./src/routes/favoriteRoutes');
+const notificationRoutes = require('./src/routes/notificationRoutes');
+const reportRoutes = require('./src/routes/reportRoutes');
+const adminRoutes = require('./src/routes/adminRoutes');
 cloudinary = require('./config/cloudinary');
 require('dotenv').config();
 
@@ -11,8 +15,12 @@ const app = express();
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/v1/players', playerProfileRoutes);
+app.use('/api/v1/recruiter', recruiterProfileRoutes);
 app.use('/api/v1/videos', videoRoutes);
 app.use('/api/v1/favorites', favoriteRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 app.use((err, req, res, next) => {
   console.error('=== Erreur non gérée ===');
