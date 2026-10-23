@@ -12,8 +12,26 @@ class VideoModel {
   final int viewsCount;
   int likesCount;
   final int commentsCount;
+  bool isLiked;
   final UserModel? author;
   final String createdAt;
+
+  /// URL d'aperçu à afficher : la vraie miniature si le backend en a généré
+  /// une, sinon une image extraite de la vidéo Cloudinary elle-même, sinon un
+  /// visuel de secours générique.
+  String get resolvedThumbnailUrl {
+    if (thumbnailUrl != null && thumbnailUrl!.isNotEmpty) {
+      return thumbnailUrl!;
+    }
+    if (videoUrl.contains('res.cloudinary.com')) {
+      final lastDot = videoUrl.lastIndexOf('.');
+      if (lastDot != -1) {
+        final withoutExt = videoUrl.substring(0, lastDot);
+        return '${withoutExt.replaceFirst('/upload/', '/upload/so_1/')}.jpg';
+      }
+    }
+    return 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800';
+  }
 
   VideoModel({
     required this.id,
@@ -27,6 +45,7 @@ class VideoModel {
     this.viewsCount = 0,
     this.likesCount = 0,
     this.commentsCount = 0,
+    this.isLiked = false,
     this.author,
     required this.createdAt,
   });
@@ -44,7 +63,10 @@ class VideoModel {
       viewsCount: json['viewsCount'] ?? 0,
       likesCount: json['likesCount'] ?? 0,
       commentsCount: json['commentsCount'] ?? 0,
-      author: json['author'] != null ? UserModel.fromJson(json['author']) : null,
+      isLiked: json['isLiked'] ?? false,
+      author: json['author'] != null
+          ? UserModel.fromJson(json['author'])
+          : null,
       createdAt: json['createdAt'] ?? '',
     );
   }

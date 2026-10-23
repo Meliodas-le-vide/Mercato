@@ -12,7 +12,7 @@ const PlayerProfile = sequelize.define('PlayerProfile', {
   userId: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    unique: true, // garantit la relation 1-to-1 : un seul profil par user
+    unique: true, 
   },
 
   position: {
@@ -55,11 +55,19 @@ const PlayerProfile = sequelize.define('PlayerProfile', {
   height: {
     type: DataTypes.INTEGER,
     allowNull: true,
+    validate: {
+      min: 100,
+      max: 250,
+    },
   },
 
   weight: {
     type: DataTypes.INTEGER,
     allowNull: true,
+    validate: {
+      min: 30,
+      max: 200,
+    },
   },
 
   city: {
@@ -77,29 +85,34 @@ const PlayerProfile = sequelize.define('PlayerProfile', {
     allowNull: true,
   },
 
-  goals: {
+    goals: {
     type: DataTypes.INTEGER,
     defaultValue: 0,
+    validate: { min: 0 },
   },
 
   assists: {
     type: DataTypes.INTEGER,
     defaultValue: 0,
+    validate: { min: 0 },
   },
 
   matchesPlayed: {
     type: DataTypes.INTEGER,
     defaultValue: 0,
+    validate: { min: 0 },
   },
 
   cardsYellow: {
     type: DataTypes.INTEGER,
     defaultValue: 0,
+    validate: { min: 0 },
   },
 
   cardsRed: {
     type: DataTypes.INTEGER,
     defaultValue: 0,
+    validate: { min: 0 },
   },
 
  

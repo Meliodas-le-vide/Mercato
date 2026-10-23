@@ -34,6 +34,7 @@ const Report = sequelize.define('Report', {
     allowNull: false,
     defaultValue: 'OPEN',
   },
+  
 
 }, {
   tableName: 'reports',

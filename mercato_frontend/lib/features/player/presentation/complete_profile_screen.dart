@@ -1,13 +1,21 @@
 import 'dart:convert';
+
+import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
+import 'package:mercato_frontend/core/widgets/app_snackbar.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:mercato_frontend/config/routes/app_routes.dart';
+import 'package:mercato_frontend/core/widgets/app_loader.dart';
+import 'package:mercato_frontend/core/widgets/pitch_position_picker.dart';
 import 'package:mercato_frontend/core/widgets/player_avatar_picker.dart';
 import 'package:mercato_frontend/features/player/data/player_repository.dart';
+import 'package:mercato_frontend/features/player/domain/player_labels.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/theme/app_theme.dart';
 import '../domain/player_profile_model.dart';
 import '../../auth/domain/user_model.dart';
-
 
 class CompleteProfileScreen extends StatefulWidget {
   const CompleteProfileScreen({super.key});
@@ -36,47 +44,35 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   bool _isLoading = false;
   bool _isSaving = false;
 
-  static const Map<String, String> _positions = {
-    'GARDIEN': 'Gardien',
-    'DEFENSEUR_CENTRAL': 'Défenseur central',
-    'LATERAL_DROIT': 'Latéral droit',
-    'LATERAL_GAUCHE': 'Latéral gauche',
-    'MILIEU_DEFENSIF': 'Milieu défensif',
-    'MILIEU_CENTRAL': 'Milieu central',
-    'MILIEU_OFFENSIF': 'Milieu offensif',
-    'AILIER_DROIT': 'Ailier droit',
-    'AILIER_GAUCHE': 'Ailier gauche',
-    'ATTAQUANT': 'Attaquant',
-  };
-
-  static const Map<String, String> _feet = {
-    'DROIT': 'Droit',
-    'GAUCHE': 'Gauche',
-    'AMBIDEXTRE': 'Ambidextre',
-  };
-
-  static const Map<String, String> _levels = {
-    'AMATEUR': 'Amateur',
-    'SEMI_PRO': 'Semi-professionnel',
-    'PRO': 'Professionnel',
-  };
-
   @override
   void initState() {
     super.initState();
     _loadExistingProfile();
   }
 
-  /// Précharge le profil existant (toujours le cas ici, puisqu'on édite)
+  @override
+  void dispose() {
+    _clubController.dispose();
+    _cityController.dispose();
+    _countryController.dispose();
+    _bioController.dispose();
+    _heightController.dispose();
+    _weightController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadExistingProfile() async {
     setState(() => _isLoading = true);
     try {
       final profile = await _repository.getMe();
+      if (!mounted) return;
       setState(() {
         _selectedPosition = profile.position;
         _selectedFoot = profile.strongFoot;
         _selectedLevel = profile.level;
-        _birthDate = profile.birthDate != null ? DateTime.tryParse(profile.birthDate!) : null;
+        _birthDate = profile.birthDate != null
+            ? DateTime.tryParse(profile.birthDate!)
+            : null;
         _clubController.text = profile.currentClub ?? '';
         _cityController.text = profile.city ?? '';
         _countryController.text = profile.country ?? '';
@@ -85,23 +81,20 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         _weightController.text = profile.weight?.toString() ?? '';
       });
     } catch (_) {
-      // Pas de profil existant -> formulaire vide, comportement normal au premier remplissage
+      // Pas de profil existant -> formulaire vide
     }
 
-    // Avatar : souvent absent à ce stade (juste après inscription), mais on tente
-    // quand même de le charger au cas où l'utilisateur revient sur cet écran.
     try {
       final userJson = await _storage.read(key: 'user_data');
       if (userJson != null) {
         final user = UserModel.fromJson(jsonDecode(userJson));
-        setState(() => _avatarUrl = user.Profile_image);
+        if (mounted) setState(() => _avatarUrl = user.Profile_image);
       }
     } catch (_) {}
 
     if (mounted) setState(() => _isLoading = false);
   }
 
-  /// Met à jour le cache local user_data avec la nouvelle URL d'avatar
   Future<void> _handleAvatarUpdated(String newUrl) async {
     setState(() => _avatarUrl = newUrl);
 
@@ -119,26 +112,53 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       Profile_image: newUrl,
     );
 
-    await _storage.write(key: 'user_data', value: jsonEncode(updatedUser.toJson()));
+    await _storage.write(
+      key: 'user_data',
+      value: jsonEncode(updatedUser.toJson()),
+    );
+  }
+
+  Future<bool> _isCurrentlyPlainUser() async {
+    final userJson = await _storage.read(key: 'user_data');
+    if (userJson == null) return false;
+    return UserModel.fromJson(jsonDecode(userJson)).role == 'USER';
   }
 
   Future<void> _pickBirthDate() async {
     final now = DateTime.now();
+    final colors = context.colors;
+
     final picked = await showDatePicker(
       context: context,
       initialDate: _birthDate ?? DateTime(now.year - 18),
       firstDate: DateTime(now.year - 60),
       lastDate: DateTime(now.year - 5),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppColors.accentOrange,
+              brightness: Theme.of(context).brightness,
+            ),
+            dialogBackgroundColor: colors.surface,
+          ),
+          child: child!,
+        );
+      },
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() => _birthDate = picked);
     }
   }
 
   Future<void> _handleSave() async {
-    if (_selectedPosition == null || _selectedLevel == null || _birthDate == null || _cityController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Poste, niveau, date de naissance et ville sont obligatoires')),
+    if (_selectedPosition == null ||
+        _selectedLevel == null ||
+        _birthDate == null ||
+        _cityController.text.trim().isEmpty) {
+      _showSnackBar(
+        message: 'Poste, niveau, date de naissance et ville sont obligatoires',
+        isError: true,
       );
       return;
     }
@@ -147,182 +167,326 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
     try {
       final profile = PlayerProfileModel(
-        userId: 0, // ignoré à l'update, le backend utilise le token
+        userId: 0,
         position: _selectedPosition,
         strongFoot: _selectedFoot,
         birthDate: _birthDate!.toIso8601String().split('T').first,
         level: _selectedLevel,
-        currentClub: _clubController.text.trim().isEmpty ? null : _clubController.text.trim(),
+        currentClub: _clubController.text.trim().isEmpty
+            ? null
+            : _clubController.text.trim(),
         city: _cityController.text.trim(),
-        country: _countryController.text.trim().isEmpty ? null : _countryController.text.trim(),
-        bio: _bioController.text.trim().isEmpty ? null : _bioController.text.trim(),
+        country: _countryController.text.trim().isEmpty
+            ? null
+            : _countryController.text.trim(),
+        bio: _bioController.text.trim().isEmpty
+            ? null
+            : _bioController.text.trim(),
         height: int.tryParse(_heightController.text.trim()),
         weight: int.tryParse(_weightController.text.trim()),
       );
 
-      await _repository.updateMe(profile);
+      final wasUser = await _isCurrentlyPlainUser();
+      final result = await _repository.updateMe(profile);
+
+      if (result.user != null) {
+        await _storage.write(
+          key: 'user_data',
+          value: jsonEncode(result.user!.toJson()),
+        );
+        await _storage.write(key: 'user_role', value: result.user!.role);
+      }
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profil enregistré !')),
+      final justBecamePlayer = wasUser && result.user?.role == 'PLAYER';
+
+      _showSnackBar(
+        message: justBecamePlayer
+            ? 'Bravo, tu es maintenant un joueur !'
+            : 'Profil enregistré !',
+        isError: false,
       );
 
-      // Poussé juste après l'inscription (pushReplacementNamed) -> pas de retour possible,
-      // on va directement au dashboard.
-      Navigator.pushReplacementNamed(context, '/player-dashboard');
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.playerDashboard,
+        (route) => false,
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erreur lors de l\'enregistrement du profil')),
+      _showSnackBar(
+        message: 'Erreur lors de l\'enregistrement du profil',
+        isError: true,
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
+  void _showSnackBar({required String message, required bool isError}) {
+    if (isError) {
+      AppSnackbar.error(context, message);
+    } else {
+      AppSnackbar.success(context, message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF0A0E1A),
-        body: Center(child: CircularProgressIndicator(color: AppColors.primaryNeon)),
+      return Scaffold(
+        backgroundColor: colors.background,
+        body: const Center(child: AppLoader()),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E1A),
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0A0E1A),
-        title: const Text('Complète ton profil', style: TextStyle(color: Colors.white)),
+        automaticallyImplyLeading: false,
         elevation: 0,
-              leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        backgroundColor: colors.surface,
+        toolbarHeight: 64,
+        // Ouvert depuis le profil → bouton retour. Ouvert à la première
+        // connexion (rien derrière) → pas de retour, mais « Plus tard ».
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                icon: Icon(
+                  Icons.arrow_back_ios_new,
+                  color: colors.icon,
+                  size: 18,
+                ),
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
+        titleSpacing: Navigator.canPop(context) ? 12 : 20,
+        actions: [
+          if (!Navigator.canPop(context))
+            TextButton(
+              onPressed: () => Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.playerDashboard,
+                (route) => false,
+              ),
+              child: Text(
+                'Plus tard',
+                style: TextStyle(color: colors.textSecondary, fontSize: 14),
+              ),
+            ),
+        ],
+        title: Text(
+          'Compléter le profil',
+          style: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 20,
+            fontWeight: context.weight(FontWeight.w700),
+            letterSpacing: -0.3,
+          ),
         ),
       ),
       body: SafeArea(
+        top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              PlayerAvatarPicker(
-                initialAvatarUrl: _avatarUrl,
-                onAvatarUpdated: _handleAvatarUpdated,
-              ),
-              const SizedBox(height: 20),
-
-              const Text(
-                'Ces informations seront visibles par les recruteurs.',
-                style: TextStyle(color: Colors.white54, fontSize: 12),
-              ),
-              const SizedBox(height: 20),
-
-              _buildDropdown('Poste *', _selectedPosition, _positions, (v) => setState(() => _selectedPosition = v)),
-              const SizedBox(height: 12),
-
-              _buildDropdown('Pied fort', _selectedFoot, _feet, (v) => setState(() => _selectedFoot = v)),
-              const SizedBox(height: 12),
-
-              _buildDropdown('Niveau *', _selectedLevel, _levels, (v) => setState(() => _selectedLevel = v)),
-              const SizedBox(height: 12),
-
-              GestureDetector(
-                onTap: _pickBirthDate,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E2638),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _birthDate == null
-                            ? 'Date de naissance *'
-                            : '${_birthDate!.day}/${_birthDate!.month}/${_birthDate!.year}',
-                        style: TextStyle(
-                          color: _birthDate == null ? Colors.white38 : Colors.white,
-                          fontSize: 13,
-                        ),
+              FadeInDown(
+                duration: const Duration(milliseconds: 400),
+                child: Column(
+                  children: [
+                    PlayerAvatarPicker(
+                      initialAvatarUrl: _avatarUrl,
+                      onAvatarUpdated: _handleAvatarUpdated,
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Ces informations seront visibles par les recruteurs.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: colors.textSecondary,
+                        fontSize: 13,
+                        height: 1.4,
                       ),
-                      const Icon(Icons.calendar_today, color: Colors.white54, size: 18),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 32),
 
-              _buildTextField(_clubController, 'Club actuel (optionnel)', Icons.shield_outlined),
-              const SizedBox(height: 12),
-
-              Row(
-                children: [
-                  Expanded(child: _buildTextField(_cityController, 'Ville *', Icons.location_on_outlined)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildTextField(_countryController, 'Pays', Icons.public)),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(_heightController, 'Taille (cm)', Icons.height,
-                        keyboardType: TextInputType.number),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildTextField(_weightController, 'Poids (kg)', Icons.monitor_weight_outlined,
-                        keyboardType: TextInputType.number),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              TextField(
-                controller: _bioController,
-                maxLines: 4,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Parle un peu de toi, de ton parcours...',
-                  hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-                  fillColor: const Color(0xFF1E2638),
-                  filled: true,
-                  contentPadding: const EdgeInsets.all(16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
+              FadeInUp(
+                duration: const Duration(milliseconds: 400),
+                delay: const Duration(milliseconds: 60),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _SectionLabel(label: 'Poste principal'),
+                    const SizedBox(height: 8),
+                    PitchPositionPicker(
+                      selected: _selectedPosition,
+                      onChanged: (v) => setState(() => _selectedPosition = v),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
 
-              ElevatedButton(
-                onPressed: _isSaving ? null : _handleSave,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryNeon,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.all(16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              FadeInUp(
+                duration: const Duration(milliseconds: 400),
+                delay: const Duration(milliseconds: 100),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _SectionLabel(label: 'Caractéristiques'),
+                    const SizedBox(height: 8),
+                    _FormGroup(
+                      children: [
+                        _FormDropdown(
+                          label: 'Pied fort',
+                          hint: 'Sélectionner',
+                          value: _selectedFoot,
+                          options: PlayerLabels.feet,
+                          onChanged: (v) => setState(() => _selectedFoot = v),
+                        ),
+                        _FormDropdown(
+                          label: 'Niveau',
+                          required: true,
+                          hint: 'Sélectionner',
+                          value: _selectedLevel,
+                          options: PlayerLabels.levels,
+                          onChanged: (v) => setState(() => _selectedLevel = v),
+                        ),
+                        _FormDatePicker(
+                          label: 'Date de naissance',
+                          required: true,
+                          value: _birthDate,
+                          onTap: _pickBirthDate,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                child: _isSaving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
-                      )
-                    : const Text('Enregistrer mon profil', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 28),
 
-              TextButton(
-                onPressed: () => Navigator.pushReplacementNamed(context, '/player-dashboard'),
-                child: const Text(
-                  'Compléter plus tard',
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
+              FadeInUp(
+                duration: const Duration(milliseconds: 400),
+                delay: const Duration(milliseconds: 140),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _SectionLabel(label: 'Situation'),
+                    const SizedBox(height: 8),
+                    _FormGroup(
+                      children: [
+                        _FormField(
+                          controller: _clubController,
+                          label: 'Club actuel',
+                          helper: 'Optionnel',
+                        ),
+                        _FormField(
+                          controller: _cityController,
+                          label: 'Ville',
+                          required: true,
+                          textCapitalization: TextCapitalization.words,
+                        ),
+                        _FormField(
+                          controller: _countryController,
+                          label: 'Pays',
+                          textCapitalization: TextCapitalization.words,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              FadeInUp(
+                duration: const Duration(milliseconds: 400),
+                delay: const Duration(milliseconds: 180),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _SectionLabel(label: 'Physique'),
+                    const SizedBox(height: 8),
+                    _FormGroup(
+                      children: [
+                        _FormField(
+                          controller: _heightController,
+                          label: 'Taille',
+                          helper: 'en cm',
+                          keyboardType: TextInputType.number,
+                        ),
+                        _FormField(
+                          controller: _weightController,
+                          label: 'Poids',
+                          helper: 'en kg',
+                          keyboardType: TextInputType.number,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              FadeInUp(
+                duration: const Duration(milliseconds: 400),
+                delay: const Duration(milliseconds: 220),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _SectionLabel(label: 'À propos'),
+                    const SizedBox(height: 8),
+                    _BioField(controller: _bioController),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              FadeInUp(
+                duration: const Duration(milliseconds: 400),
+                delay: const Duration(milliseconds: 260),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: FilledButton(
+                        onPressed: _isSaving ? null : _handleSave,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colors.textPrimary,
+                          foregroundColor: colors.background,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isSaving
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: AppLoader(
+                                  size: 20,
+                                  color: colors.background,
+                                ),
+                              )
+                            : Text(
+                                'Enregistrer mon profil',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: context.weight(FontWeight.w600),
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -331,54 +495,341 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       ),
     );
   }
+}
 
-  Widget _buildTextField(TextEditingController controller, String hint, IconData icon,
-      {TextInputType? keyboardType}) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.white, fontSize: 14),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-        fillColor: const Color(0xFF1E2638),
-        filled: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        suffixIcon: Icon(icon, color: Colors.white54, size: 20),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
+class _SectionLabel extends StatelessWidget {
+  final String label;
+
+  const _SectionLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: colors.textSecondary,
+          fontSize: 12,
+          fontWeight: context.weight(FontWeight.w600),
+          letterSpacing: 0.5,
         ),
       ),
     );
   }
+}
 
-  Widget _buildDropdown(
-    String hint,
-    String? value,
-    Map<String, String> options,
-    void Function(String?) onChanged,
-  ) {
+class _FormGroup extends StatelessWidget {
+  final List<Widget> children;
+
+  const _FormGroup({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E2638),
-        borderRadius: BorderRadius.circular(10),
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.border),
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          hint: Text(hint, style: const TextStyle(color: Colors.white38, fontSize: 13)),
-          isExpanded: true,
-          dropdownColor: const Color(0xFF1E2638),
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          icon: const Icon(Icons.arrow_drop_down, color: Colors.white54),
-          items: options.entries
-              .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-              .toList(),
-          onChanged: onChanged,
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            children[i],
+            if (i < children.length - 1)
+              Divider(
+                height: 1,
+                thickness: 1,
+                indent: 16,
+                endIndent: 16,
+                color: colors.divider,
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FormField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final bool required;
+  final bool readOnly;
+  final TextInputType? keyboardType;
+  final TextCapitalization textCapitalization;
+  final String? helper;
+
+  const _FormField({
+    required this.controller,
+    required this.label,
+    this.required = false,
+    this.keyboardType,
+    this.textCapitalization = TextCapitalization.none,
+    this.helper,
+  }) : readOnly = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _LabelRow(label: label, required: required, helper: helper),
+          const SizedBox(height: 8),
+          TextField(
+            controller: controller,
+            readOnly: readOnly,
+            keyboardType: keyboardType,
+            textCapitalization: textCapitalization,
+            style: TextStyle(
+              color: readOnly ? colors.textTertiary : colors.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+            decoration: const InputDecoration(
+              isDense: true,
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              hintText: '',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormDropdown extends StatelessWidget {
+  final String label;
+  final String hint;
+  final bool required;
+  final String? value;
+  final Map<String, String> options;
+  final ValueChanged<String?> onChanged;
+
+  const _FormDropdown({
+    required this.label,
+    required this.hint,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+    this.required = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _LabelRow(label: label, required: required),
+          const SizedBox(height: 4),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isDense: true,
+              isExpanded: true,
+              dropdownColor: colors.surface,
+              hint: Text(
+                hint,
+                style: TextStyle(
+                  color: colors.textTertiary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              style: TextStyle(
+                color: colors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+              icon: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: colors.iconMuted,
+                size: 22,
+              ),
+              items: options.entries
+                  .map(
+                    (e) => DropdownMenuItem(
+                      value: e.key,
+                      child: Text(
+                        e.value,
+                        style: TextStyle(
+                          color: colors.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormDatePicker extends StatelessWidget {
+  final String label;
+  final bool required;
+  final DateTime? value;
+  final VoidCallback onTap;
+
+  const _FormDatePicker({
+    required this.label,
+    required this.value,
+    required this.onTap,
+    this.required = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final hasValue = value != null;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _LabelRow(label: label, required: required),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    hasValue
+                        ? '${value!.day.toString().padLeft(2, '0')}/${value!.month.toString().padLeft(2, '0')}/${value!.year}'
+                        : 'Sélectionner une date',
+                    style: TextStyle(
+                      color: hasValue
+                          ? colors.textPrimary
+                          : colors.textTertiary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.calendar_today_outlined,
+                  color: colors.iconMuted,
+                  size: 18,
+                ),
+              ],
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _BioField extends StatelessWidget {
+  final TextEditingController controller;
+
+  const _BioField({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _LabelRow(label: 'Bio', helper: 'Optionnel'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: controller,
+            maxLines: 5,
+            style: TextStyle(
+              color: colors.textPrimary,
+              fontSize: 15,
+              height: 1.4,
+            ),
+            decoration: InputDecoration(
+              isDense: true,
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              hintText: 'Parle un peu de toi, de ton parcours…',
+              hintStyle: TextStyle(
+                color: colors.textTertiary,
+                fontSize: 15,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LabelRow extends StatelessWidget {
+  final String label;
+  final bool required;
+  final String? helper;
+
+  const _LabelRow({required this.label, this.required = false, this.helper});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Row(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: colors.textSecondary,
+            fontSize: 12,
+            fontWeight: context.weight(FontWeight.w600),
+            letterSpacing: 0.3,
+          ),
+        ),
+        if (required)
+          Text(
+            ' *',
+            style: TextStyle(
+              color: AppColors.error,
+              fontSize: 12,
+              fontWeight: context.weight(FontWeight.w600),
+            ),
+          ),
+        const Spacer(),
+        if (helper != null)
+          Text(
+            helper!,
+            style: TextStyle(
+              color: colors.textTertiary,
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+      ],
     );
   }
 }

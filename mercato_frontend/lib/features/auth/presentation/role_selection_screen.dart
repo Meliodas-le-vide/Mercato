@@ -1,198 +1,6 @@
-// import 'package:flutter/material.dart';
-// import '../../../core/constants/app_colors.dart';
-
-// class RoleSelectionScreen extends StatelessWidget {
-//   const RoleSelectionScreen({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: const Color(0xFF0A0E1A),
-//       body: SafeArea(
-//         child: SingleChildScrollView(
-//           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-//           child: Column(
-//             crossAxisAlignment: CrossAxisAlignment.stretch,
-//             children: [
-//               const SizedBox(height: 10),
-//               // En-tête
-//               const Text(
-//                 'MERCATO',
-//                 textAlign: TextAlign.center,
-//                 style: TextStyle(
-//                   fontSize: 32,
-//                   fontWeight: FontWeight.w900,
-//                   color: AppColors.primaryNeon,
-//                   letterSpacing: 1.5,
-//                 ),
-//               ),
-//               const SizedBox(height: 8),
-//               const Text(
-//                 'Que souhaitez-vous faire sur la plateforme ?',
-//                 textAlign: TextAlign.center,
-//                 style: TextStyle(
-//                   fontSize: 18,
-//                   fontWeight: FontWeight.bold,
-//                   color: Colors.white,
-//                 ),
-//               ),
-//               const SizedBox(height: 6),
-//               const Text(
-//                 'Choisissez votre profil pour personnaliser votre expérience.',
-//                 textAlign: TextAlign.center,
-//                 style: TextStyle(color: Colors.white54, fontSize: 12),
-//               ),
-//               const SizedBox(height: 28),
-
-//               // Carte 1 : FAN / DÉCOUVRIR
-//               _RoleCard(
-//                 title: 'JE SUIS UN FAN / DÉCOUVRIR',
-//                 subtitle: null,
-//                 badgeText: null,
-//                 icon: Icons.arrow_forward,
-//                 onTap: () {
-//                   Navigator.pushNamed(context, '/register', arguments: 'USER');
-//                 },
-//               ),
-//               const SizedBox(height: 16),
-
-//               // Carte 2 : JOUEUR
-//               _RoleCard(
-//                 title: 'JE SUIS UN JOUEUR',
-//                 subtitle: 'Crée ton CV vidéo et fais-toi repérer',
-//                 badgeText: 'CRÉER MON CV VIDÉO',
-//                 icon: Icons.sports_soccer,
-//                 onTap: () {
-//                   Navigator.pushNamed(context, '/register', arguments: 'PLAYER');
-//                 },
-//               ),
-//               const SizedBox(height: 16),
-
-//               // Carte 3 : RECRUTEUR / AGENT
-//               _RoleCard(
-//                 title: 'JE SUIS RECRUTEUR\nCLUB / AGENT',
-//                 subtitle: 'Accède au vivier de talents exclusif',
-//                 badgeText: 'ACCÈS PREMIUM',
-//                 icon: Icons.search,
-//                 onTap: () {
-//                   Navigator.pushNamed(context, '/register', arguments: 'RECRUITER');
-//                 },
-//               ),
-//               const SizedBox(height: 24),
-
-//               // Lien de connexion rapide
-//               Row(
-//                 mainAxisAlignment: MainAxisAlignment.center,
-//                 children: [
-//                   const Text(
-//                     'J\'ai déjà un compte. ',
-//                     style: TextStyle(color: Colors.white54, fontSize: 13),
-//                   ),
-//                   GestureDetector(
-//                     onTap: () {
-//                       Navigator.pushNamed(context, '/login', arguments: 'USER');
-//                     },
-//                     child: const Text(
-//                       'Se connecter.',
-//                       style: TextStyle(
-//                         color: AppColors.primaryNeon,
-//                         fontWeight: FontWeight.bold,
-//                         fontSize: 13,
-//                       ),
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }
-
-// class _RoleCard extends StatelessWidget {
-//   final String title;
-//   final String? subtitle;
-//   final String? badgeText;
-//   final IconData icon;
-//   final VoidCallback onTap;
-
-//   const _RoleCard({
-//     required this.title,
-//     this.subtitle,
-//     this.badgeText,
-//     required this.icon,
-//     required this.onTap,
-//   });
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return InkWell(
-//       onTap: onTap,
-//       borderRadius: BorderRadius.circular(16),
-//       child: Container(
-//         padding: const EdgeInsets.all(20),
-//         decoration: BoxDecoration(
-//           color: const Color(0xFF13192B),
-//           borderRadius: BorderRadius.circular(16),
-//           border: Border.all(color: Colors.white.withOpacity(0.08)),
-//         ),
-//         child: Stack(
-//           children: [
-//             Column(
-//               crossAxisAlignment: CrossAxisAlignment.start,
-//               children: [
-//                 if (badgeText != null) ...[
-//                   Container(
-//                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-//                     decoration: BoxDecoration(
-//                       color: AppColors.primaryNeon,
-//                       borderRadius: BorderRadius.circular(20),
-//                     ),
-//                     child: Text(
-//                       badgeText!,
-//                       style: const TextStyle(
-//                         color: Colors.black,
-//                         fontWeight: FontWeight.bold,
-//                         fontSize: 9,
-//                       ),
-//                     ),
-//                   ),
-//                   const SizedBox(height: 12),
-//                 ],
-//                 if (subtitle != null) ...[
-//                   Text(
-//                     subtitle!,
-//                     style: const TextStyle(color: Colors.white54, fontSize: 11),
-//                   ),
-//                   const SizedBox(height: 4),
-//                 ],
-//                 Text(
-//                   title,
-//                   style: const TextStyle(
-//                     color: Colors.white,
-//                     fontWeight: FontWeight.w900,
-//                     fontSize: 16,
-//                     height: 1.2,
-//                   ),
-//                 ),
-//               ],
-//             ),
-//             Positioned(
-//               right: 0,
-//               bottom: 0,
-//               child: Icon(icon, color: Colors.white54, size: 22),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }
-
-
 import 'package:flutter/material.dart';
+import 'package:mercato_frontend/core/theme/app_theme.dart';
+import 'package:mercato_frontend/core/constants/app_colors.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -202,9 +10,6 @@ class RoleSelectionScreen extends StatefulWidget {
 }
 
 class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
-  static const Color primaryYellow = Color(0xFFFFD600);
-  static const Color darkBlue = Color(0xFF0F2137);
-
   String _selectedRole = 'PLAYER';
 
   void _onContinue() {
@@ -214,117 +19,244 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: darkBlue,
+      backgroundColor: AppColors.backgroundDark,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              
-              const Text(
-                'MERCATO',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: primaryYellow,
-                  
-                ),
-              ),
-              const SizedBox(height: 8),
-                 const Text(
-                'Choisissez votre profil pour personnaliser votre expérience.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white54, fontSize: 14),
-              ),
-              const SizedBox(height: 10),
-
-             
-              Expanded(
-                child: ListView(
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                   
-                    _RoleImageCard(
-                      title: 'Showcase your\ntalent',
-                      buttonLabel: 'Player',
-                      imageUrl: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=800',
-                      isSelected: _selectedRole == 'PLAYER',
-                      onTap: () => setState(() => _selectedRole = 'PLAYER'),
-                    ),
-                    const SizedBox(height: 16),
-
-                    _RoleImageCard(
-                      title: 'Find the next\nsuperstar',
-                      buttonLabel: 'Scout',
-                      imageUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800',
-                      isSelected: _selectedRole == 'RECRUITER',
-                      onTap: () => setState(() => _selectedRole = 'RECRUITER'),
-                    ),
-                    const SizedBox(height: 16),
-
-                    _RoleImageCard(
-                      title: 'Capture life-\nchanging moments',
-                      buttonLabel: 'Fan / Videographer',
-                      imageUrl: 'https://images.unsplash.com/photo-1517466787929-bc90951d0974?w=800',
-                      isSelected: _selectedRole == 'USER',
-                      onTap: () => setState(() => _selectedRole = 'USER'),
-                    ),
-                  ],
-                ),
-              ),
-
-
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _onContinue,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: darkBlue,
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(26),
-                      side: const BorderSide(color: primaryYellow, width: 2),
-                    ),
-                    shadowColor: primaryYellow.withOpacity(0.4),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+              child: Column(
+                children: [
+                  Image.asset(
+                    "assets/images/logo.png",
+                    width: 100,
+                    height: 100,
                   ),
-                  child: const Text(
-                    'Continue',
+                  const SizedBox(height: 20),
+                  Text(
+                    'Bienvenue sur Mercato',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 24,
+                      fontWeight: context.weight(FontWeight.w700),
+                      letterSpacing: -0.4,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Choisis ton profil pour personnaliser ton expérience',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            Expanded(
+              child: ListView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                children: [
+                  _RoleCard(
+                    title: 'Joueur',
+                    subtitle: 'Révèle ton talent',
+                    imagePath: 'assets/images/role/7.jpg',
+                    isSelected: _selectedRole == 'PLAYER',
+                    onTap: () => setState(() => _selectedRole = 'PLAYER'),
+                  ),
+                  const SizedBox(height: 12),
+                  _RoleCard(
+                    title: 'Recruteur',
+                    subtitle: 'Trouve les prochaines pépites',
+                    imagePath: 'assets/images/role/5.jpg',
+                    isSelected: _selectedRole == 'RECRUITER',
+                    onTap: () => setState(() => _selectedRole = 'RECRUITER'),
+                  ),
+                  const SizedBox(height: 12),
+                  _RoleCard(
+                    title: 'Fan',
+                    subtitle: 'Vis le foot de l\'intérieur',
+                    imagePath: 'assets/images/role/6.jpg',
+                    isSelected: _selectedRole == 'USER',
+                    onTap: () => setState(() => _selectedRole = 'USER'),
+                  ),
+                ],
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+              child: SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton(
+                  onPressed: _onContinue,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryYellow,
+                    foregroundColor: AppColors.onGold,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Continuer',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: context.weight(FontWeight.w700),
+                      letterSpacing: 0.1,
                     ),
                   ),
                 ),
               ),
+            ),
 
-              const SizedBox(height: 12),
-
-           
-              Row(
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    "J'ai déjà un compte. ",
-                    style: TextStyle(color: Colors.white60, fontSize: 13),
+                    'Déjà un compte ? ',
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                   GestureDetector(
                     onTap: () {
                       Navigator.pushNamed(context, '/login', arguments: 'USER');
                     },
-                    child: const Text(
-                      'Se connecter.',
+                    child: Text(
+                      'Se connecter',
                       style: TextStyle(
-                        color: primaryYellow,
-                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryYellow,
+                        fontWeight: context.weight(FontWeight.w700),
                         fontSize: 13,
                       ),
                     ),
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final String imagePath;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _RoleCard({
+    required this.title,
+    required this.subtitle,
+    required this.imagePath,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        height: 120,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected
+                ? AppColors.primaryYellow
+                : Colors.white.withValues(alpha: 0.08),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(13),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                imagePath,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: const Color(0xFF1A1C23),
+                    child: Icon(
+                      Icons.image_outlined,
+                      color: Colors.white.withValues(alpha: 0.3),
+                      size: 32,
+                    ),
+                  );
+                },
+              ),
+
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.75),
+                      Colors.black.withValues(alpha: 0.35),
+                      Colors.black.withValues(alpha: 0.15),
+                    ],
+                    stops: const [0.0, 0.6, 1.0],
+                  ),
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            title,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: context.weight(FontWeight.w700),
+                              letterSpacing: -0.2,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w400,
+                              height: 1.3,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    _RadioIndicator(isSelected: isSelected),
+                  ],
+                ),
               ),
             ],
           ),
@@ -334,96 +266,31 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   }
 }
 
-class _RoleImageCard extends StatelessWidget {
-  final String title;
-  final String buttonLabel;
-  final String imageUrl;
+class _RadioIndicator extends StatelessWidget {
   final bool isSelected;
-  final VoidCallback onTap;
 
-  static const Color primaryYellow = Color(0xFFFFD600);
-  static const Color darkBlue = Color(0xFF0F2137);
-
-  const _RoleImageCard({
-    required this.title,
-    required this.buttonLabel,
-    required this.imageUrl,
-    required this.isSelected,
-    required this.onTap,
-  });
+  const _RadioIndicator({required this.isSelected});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 155,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          image: DecorationImage(
-            image: NetworkImage(imageUrl),
-            fit: BoxFit.cover,
-          ),
-          border: isSelected ? Border.all(color: primaryYellow, width: 2.5) : null,
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: primaryYellow.withOpacity(0.35),
-                    blurRadius: 10,
-                    spreadRadius: 1,
-                  )
-                ]
-              : null,
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                darkBlue.withOpacity(0.4),
-                darkBlue.withOpacity(0.85),
-              ],
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  height: 1.25,
-                ),
-              ),
-              const SizedBox(height: 14),
-
-            
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? primaryYellow : darkBlue.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: primaryYellow, width: 1.5),
-                ),
-                child: Text(
-                  buttonLabel,
-                  style: TextStyle(
-                    color: isSelected ? darkBlue : Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-          ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isSelected ? AppColors.primaryYellow : Colors.transparent,
+        border: Border.all(
+          color: isSelected
+              ? AppColors.primaryYellow
+              : Colors.white.withValues(alpha: 0.5),
+          width: 1.5,
         ),
       ),
+      child: isSelected
+          ? const Icon(Icons.check_rounded, size: 14, color: AppColors.onGold)
+          : null,
     );
   }
 }

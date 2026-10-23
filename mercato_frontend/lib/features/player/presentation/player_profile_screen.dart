@@ -1,9 +1,17 @@
 import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:iconsax/iconsax.dart';
+
 import 'package:mercato_frontend/config/routes/app_routes.dart';
+import 'package:mercato_frontend/core/constants/app_colors.dart';
 import 'package:mercato_frontend/core/network/dio_client.dart';
+import 'package:mercato_frontend/core/theme/app_theme.dart';
+import 'package:mercato_frontend/core/theme/theme_controller.dart';
+import 'package:mercato_frontend/core/widgets/app_loader.dart';
+import 'package:mercato_frontend/core/widgets/app_surface.dart';
 import 'package:mercato_frontend/features/auth/domain/user_model.dart';
 import 'package:mercato_frontend/features/player/data/player_repository.dart';
 import 'package:mercato_frontend/features/player/domain/player_profile_model.dart';
@@ -16,9 +24,6 @@ class PlayerProfileScreen extends StatefulWidget {
 }
 
 class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
-  static const Color primaryYellow = Color(0xFFFFD600);
-  static const Color darkBlue = Color(0xFF0F2137);
-
   final _storage = const FlutterSecureStorage();
   final _profileRepository = PlayerProfileRepository(DioClient());
 
@@ -55,55 +60,100 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           rethrow;
         }
       }
-    } on DioException catch (e) {
-      debugPrint('DioException profil : status=${e.response?.statusCode} message=${e.message}');
-      if (mounted) {
-        setState(() => _errorMessage = 'Erreur lors du chargement de votre profil.');
-      }
     } catch (e) {
-      debugPrint('Erreur lors du chargement des données : $e');
       if (mounted) {
-        setState(() => _errorMessage = 'Une erreur inattendue est survenue.');
+        setState(
+          () => _errorMessage = 'Erreur lors du chargement des données.',
+        );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  void _completeProfile() async {
-    final completed = await Navigator.pushNamed(context, AppRoutes.completeProfile);
-    if (completed == true) {
-      _loadUserData();
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _editProfile() async {
     final updated = await Navigator.pushNamed(context, AppRoutes.editProfile);
-    if (updated == true) {
-      _loadUserData();
+    if (updated == true) _loadUserData();
+  }
+
+  void _becomePlayer() {
+    Navigator.pushNamed(context, AppRoutes.completeProfile);
+  }
+
+  String _roleLabel(String? role) {
+    switch (role) {
+      case 'PLAYER':
+        return 'Joueur';
+      case 'RECRUITER':
+        return 'Recruteur';
+      case 'CLUB_AGENT':
+        return 'Agent de club';
+      default:
+        return 'Membre';
+    }
+  }
+
+  String _calculateAge(String? birthDateStr) {
+    if (birthDateStr == null || birthDateStr.isEmpty) return '--';
+    try {
+      final birthDate = DateTime.parse(birthDateStr);
+      final today = DateTime.now();
+      int age = today.year - birthDate.year;
+      if (today.month < birthDate.month ||
+          (today.month == birthDate.month && today.day < birthDate.day)) {
+        age--;
+      }
+      return age.toString();
+    } catch (_) {
+      return '--';
     }
   }
 
   Future<void> _logout() async {
+    final colors = context.colors;
+
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: darkBlue,
-        title: const Text('Déconnexion', style: TextStyle(color: Colors.white)),
-        content: const Text(
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: colors.surface,
+        title: Text(
+          'Déconnexion',
+          style: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 17,
+            fontWeight: context.weight(FontWeight.w700),
+          ),
+        ),
+        content: Text(
           'Voulez-vous vraiment vous déconnecter ?',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(
+            color: colors.textSecondary,
+            fontSize: 14,
+            height: 1.4,
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler', style: TextStyle(color: Colors.white38)),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(
+              'Annuler',
+              style: TextStyle(
+                color: colors.textSecondary,
+                fontSize: 14,
+                fontWeight: context.weight(FontWeight.w600),
+              ),
+            ),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Se déconnecter', style: TextStyle(color: Colors.redAccent)),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              'Se déconnecter',
+              style: TextStyle(
+                color: AppColors.error,
+                fontWeight: context.weight(FontWeight.w700),
+                fontSize: 14,
+              ),
+            ),
           ),
         ],
       ),
@@ -120,441 +170,829 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
     }
   }
 
-  String _calculateAge(String? birthDateStr) {
-    if (birthDateStr == null || birthDateStr.isEmpty) return '--';
-    try {
-      DateTime birthDate = DateTime.parse(birthDateStr);
-      DateTime today = DateTime.now();
-      int age = today.year - birthDate.year;
-      if (today.month < birthDate.month ||
-          (today.month == birthDate.month && today.day < birthDate.day)) {
-        age--;
-      }
-      return age.toString();
-    } catch (_) {
-      return '--';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: CircularProgressIndicator(color: darkBlue),
-        ),
+      return Scaffold(
+        backgroundColor: colors.background,
+        body: const Center(child: AppLoader()),
       );
     }
 
-    final bool isConfigured = _profile?.isProfileComplete ?? false;
+    final canBecomePlayer = _user?.role == 'USER';
+    final fullName = '${_user?.firstname ?? ''} ${_user?.lastname ?? ''}'
+        .trim();
+    final roleLabel = _roleLabel(_user?.role);
+    final isConfigured = _profile?.isProfileComplete ?? false;
+    final hasClub =
+        _profile?.currentClub != null &&
+        _profile!.currentClub!.trim().isNotEmpty;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: darkBlue,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'PROFILE',
-          style: TextStyle(
-            color: primaryYellow,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.1,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.white),
-            onPressed: _logout,
-            tooltip: 'Se déconnecter',
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        color: darkBlue,
+    return HomoraPage(
+      child: RefreshIndicator(
+        color: AppColors.accentOrange,
         onRefresh: _loadUserData,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_errorMessage != null) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          // ⚠️ bottom: 120 pour que le contenu ne soit pas caché par la navbar
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+          children: [
+            // -------- HEADER --------
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Profil',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: context.weight(FontWeight.w900),
+                      letterSpacing: -0.8,
+                      color: colors.textPrimary,
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: Colors.redAccent, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Colors.redAccent, fontSize: 12),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: _loadUserData,
-                        child: const Text('Réessayer', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
-                      ),
-                    ],
+                ),
+                GestureDetector(
+                  onTap: () {},
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: colors.border),
+                    ),
+                    child: Icon(
+                      Iconsax.setting_2,
+                      size: 20,
+                      color: colors.icon,
+                    ),
                   ),
                 ),
               ],
+            ),
 
-              Container(
-                width: double.infinity,
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 12),
+              _ErrorBanner(message: _errorMessage!),
+            ],
+
+            const SizedBox(height: 20),
+
+            // -------- CARTE PROFIL --------
+            AppSurface(
+              radius: 24,
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  // Avatar avec bordure orange
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.accentOrange.withValues(alpha: 0.35),
+                        width: 2,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: SizedBox(
+                        width: 68,
+                        height: 68,
+                        child: _ProfileAvatar(
+                          imageUrl: _user?.Profile_image,
+                          size: 68,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          fullName.isEmpty ? 'Utilisateur' : fullName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: context.weight(FontWeight.w900),
+                            letterSpacing: -0.3,
+                            color: colors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          roleLabel,
+                          style: TextStyle(
+                            color: colors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.success.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            _user?.email ?? '—',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colors.success,
+                              fontWeight: context.weight(FontWeight.w700),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _editProfile,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        'Modifier',
+                        style: TextStyle(
+                          fontWeight: context.weight(FontWeight.w800),
+                          fontSize: 12,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // -------- 3 STATS --------
+            Row(
+              children: [
+                _Stat(value: _profile?.position ?? '—', label: 'Poste'),
+                const SizedBox(width: 10),
+                _Stat(value: _profile?.level ?? '—', label: 'Niveau'),
+                const SizedBox(width: 10),
+                _Stat(value: _profile?.city ?? '—', label: 'Ville'),
+              ],
+            ),
+
+            const SizedBox(height: 28),
+
+            // ============================================================
+            // PHYSIQUE — affiché si le profil est configuré
+            // ============================================================
+            if (isConfigured) ...[
+              _SectionTitle(label: 'Physique'),
+              const SizedBox(height: 12),
+              AppSurface(
+                radius: 22,
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: darkBlue,
-                  borderRadius: BorderRadius.circular(16),
-                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Stack(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: primaryYellow, width: 2),
-                              ),
-                              child: CircleAvatar(
-                                radius: 36,
-                                backgroundColor: Colors.white12,
-                                backgroundImage: _user?.Profile_image != null
-                                    ? NetworkImage(_user!.Profile_image!)
-                                    : null,
-                                child: _user?.Profile_image == null
-                                    ? const Icon(Icons.person, size: 36, color: Colors.white54)
-                                    : null,
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: GestureDetector(
-                                onTap: _editProfile,
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
-                                    color: primaryYellow,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.camera_alt,
-                                    size: 14,
-                                    color: darkBlue,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 16),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildPillBadge(
-                                icon: Icons.sports_soccer,
-                                label: _profile?.position?.toUpperCase() ?? 'NON DÉFINI',
-                                bgColor: Colors.white.withOpacity(0.15),
-                                textColor: Colors.white,
-                              ),
-                              const SizedBox(height: 6),
-                              _buildPillBadge(
-                                icon: Icons.check_circle,
-                                label: _profile?.currentClub?.toUpperCase() ?? 'SANS CLUB',
-                                bgColor: primaryYellow.withOpacity(0.2),
-                                textColor: primaryYellow,
-                                borderColor: primaryYellow,
-                              ),
-                            ],
+                          child: _InfoCell(
+                            label: 'Âge',
+                            value: '${_calculateAge(_profile?.birthDate)} ans',
+                          ),
+                        ),
+                        Expanded(
+                          child: _InfoCell(
+                            label: 'Taille',
+                            value: _profile?.height != null
+                                ? '${_profile!.height} cm'
+                                : '—',
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
-
-                    RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: '${_user?.firstname.toUpperCase() ?? 'PRÉNOM'} ',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                          TextSpan(
-                            text: _user?.lastname.toUpperCase() ?? 'NOM',
-                            style: const TextStyle(
-                              color: primaryYellow,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    Text(
-                      isConfigured
-                          ? (_profile?.bio ?? 'Aucune biographie renseignée.')
-                          : 'Bienvenue ! Ton profil n\'est pas encore visible par les recruteurs. Renseigne tes informations pour maximiser tes chances.',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 42,
-                      child: ElevatedButton.icon(
-                        onPressed: isConfigured ? _editProfile : _completeProfile,
-                        icon: Icon(
-                          isConfigured ? Icons.edit : Icons.flash_on,
-                          size: 18,
-                          color: darkBlue,
-                        ),
-                        label: Text(
-                          isConfigured ? 'ÉDITER LE PROFIL' : 'CONFIGURER LE PROFIL',
-                          style: const TextStyle(
-                            color: darkBlue,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.0,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _InfoCell(
+                            label: 'Pied fort',
+                            value: _profile?.strongFoot ?? '—',
                           ),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryYellow,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                        Expanded(
+                          child: _InfoCell(
+                            label: 'Poids',
+                            value: _profile?.weight != null
+                                ? '${_profile!.weight} kg'
+                                : '—',
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
+            ],
 
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 12,
-                childAspectRatio: 2.1,
+            // ============================================================
+            // SUR LE TERRAIN — affiché SEULEMENT si le joueur a un club
+            // ============================================================
+            if (isConfigured && hasClub) ...[
+              _SectionTitle(label: 'Sur le terrain'),
+              const SizedBox(height: 12),
+              AppSurface(
+                radius: 22,
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Row(
+                  children: [
+                    _StatCell(
+                      value: '${_profile?.matchesPlayed ?? 0}',
+                      label: 'Matchs',
+                    ),
+                    _verticalDivider(colors.divider),
+                    _StatCell(value: '${_profile?.goals ?? 0}', label: 'Buts'),
+                    _verticalDivider(colors.divider),
+                    _StatCell(
+                      value: '${_profile?.assists ?? 0}',
+                      label: 'Passes D.',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              AppSurface(
+                radius: 22,
+                padding: const EdgeInsets.all(14),
+                child: _DisciplineContent(
+                  yellowCards: _profile?.cardsYellow ?? 0,
+                  redCards: _profile?.cardsRed ?? 0,
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // ============================================================
+            // CONTACT
+            // ============================================================
+            _SectionTitle(label: 'Contact'),
+            const SizedBox(height: 12),
+            AppSurface(
+              radius: 22,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Column(
                 children: [
-                  _buildStatTile(
-                    icon: Icons.cake_outlined,
-                    label: 'ÂGE',
-                    value: isConfigured ? '${_calculateAge(_profile?.birthDate)} ans' : '--',
+                  _DetailRow(
+                    label: 'Email',
+                    value: _user?.email ?? 'Non renseigné',
                   ),
-                  _buildStatTile(
-                    icon: Icons.height,
-                    label: 'TAILLE',
-                    value: isConfigured && _profile?.height != null ? '${_profile!.height} cm' : '--',
+                  Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: colors.divider,
                   ),
-                  _buildStatTile(
-                    icon: Icons.directions_walk,
-                    label: 'PIED',
-                    value: isConfigured ? (_profile?.strongFoot ?? '--') : '--',
+                  _DetailRow(
+                    label: 'Téléphone',
+                    value: _user?.phone ?? 'Non renseigné',
                   ),
-                  _buildStatTile(
-                    icon: Icons.fitness_center,
-                    label: 'POIDS',
-                    value: isConfigured && _profile?.weight != null ? '${_profile!.weight} kg' : '--',
+                  if (isConfigured) ...[
+                    Divider(
+                      height: 1,
+                      indent: 16,
+                      endIndent: 16,
+                      color: colors.divider,
+                    ),
+                    _DetailRow(
+                      label: 'Ville',
+                      value: _profile?.city ?? 'Non renseigné',
+                    ),
+                    Divider(
+                      height: 1,
+                      indent: 16,
+                      endIndent: 16,
+                      color: colors.divider,
+                    ),
+                    _DetailRow(
+                      label: 'Pays',
+                      value: _profile?.country ?? 'Non renseigné',
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // ============================================================
+            // COMPTE
+            // ============================================================
+            _SectionTitle(label: 'Compte'),
+            const SizedBox(height: 12),
+            AppSurface(
+              radius: 22,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Column(
+                children: [
+                  _tile(
+                    Iconsax.user_edit,
+                    'Modifier mes informations',
+                    onTap: _editProfile,
+                  ),
+                  _divider(),
+                  if (canBecomePlayer) ...[
+                    _tile(
+                      Iconsax.user_tag,
+                      'Devenir joueur',
+                      onTap: _becomePlayer,
+                    ),
+                    _divider(),
+                  ],
+                  _tile(
+                     Icons.card_giftcard_rounded,
+                    'Cadeaux',
+                    onTap: () {},
                   ),
                 ],
               ),
-            
+            ),
 
-              _buildSectionTitle('STATS SUR LE TERRAIN', Icons.leaderboard),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: darkBlue,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    _buildDetailRow('Matchs Joués', '${_profile?.matchesPlayed ?? 0}'),
-                    const Divider(color: Colors.white12),
-                    _buildDetailRow('Buts marqués', '${_profile?.goals ?? 0}'),
-                    const Divider(color: Colors.white12),
-                    _buildDetailRow('Passes décisives', '${_profile?.assists ?? 0}'),
-                    const Divider(color: Colors.white12),
-                    _buildDetailRow('Cartons Jaunes', '${_profile?.cardsYellow ?? 0}'),
-                    const Divider(color: Colors.white12),
-                    _buildDetailRow('Cartons Rouges', '${_profile?.cardsRed ?? 0}'),
-                  ],
-                ),
+            const SizedBox(height: 20),
+
+            _SectionTitle(label: 'Préférences'),
+            const SizedBox(height: 12),
+            AppSurface(
+              radius: 22,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: _ThemeSwitchTile(),
+            ),
+
+            const SizedBox(height: 20),
+            
+            AppSurface(
+              radius: 22,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: _tile(
+                Iconsax.logout,
+                'Se déconnecter',
+                onTap: _logout,
+                danger: true,
               ),
-              const SizedBox(height: 8),
-             
-              _buildSectionTitle('INFORMATIONS DE CONTACT', Icons.alternate_email),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: darkBlue,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    _buildDetailRow('Email', _user?.email ?? 'Non renseigné'),
-                    const Divider(color: Colors.white12),
-                    _buildDetailRow('Téléphone', _user?.phone ?? 'Non renseigné'),
-                    const Divider(color: Colors.white12),
-                    _buildDetailRow('Ville', _profile?.city ?? 'Non renseigné'),
-                    const Divider(color: Colors.white12),
-                    _buildDetailRow('Pays', _profile?.country ?? 'Non renseigné'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 45),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title, IconData icon) {
+  Widget _divider() {
+    final colors = context.colors;
+    return Divider(height: 1, indent: 54, endIndent: 16, color: colors.divider);
+  }
+
+  Widget _verticalDivider(Color color) =>
+      Container(width: 1, height: 32, color: color);
+
+  Widget _tile(
+    IconData icon,
+    String label, {
+    required VoidCallback onTap,
+    bool danger = false,
+  }) {
+    final colors = context.colors;
+    final tint = danger ? AppColors.error : AppColors.accentOrange;
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: tint.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: tint, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontWeight: context.weight(FontWeight.w700),
+                  fontSize: 15,
+                  color: danger ? AppColors.error : colors.textPrimary,
+                ),
+              ),
+            ),
+            Icon(
+              Iconsax.arrow_right_3,
+              size: 18,
+              color: danger ? AppColors.error : colors.iconMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final String label;
+
+  const _SectionTitle({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Text(
+      label,
+      style: TextStyle(
+        fontWeight: context.weight(FontWeight.w800),
+        fontSize: 16,
+        color: colors.textPrimary,
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _Stat({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Expanded(
+      child: AppSurface(
+        radius: 18,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          children: [
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: context.weight(FontWeight.w900),
+                fontSize: 15,
+                letterSpacing: -0.4,
+                color: colors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: colors.textSecondary,
+                fontSize: 12,
+                fontWeight: context.weight(FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatCell extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _StatCell({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              color: AppColors.accentOrange,
+              fontSize: 24,
+              fontWeight: context.weight(FontWeight.w700),
+              letterSpacing: -0.5,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: colors.textSecondary,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DisciplineContent extends StatelessWidget {
+  final int yellowCards;
+  final int redCards;
+
+  const _DisciplineContent({required this.yellowCards, required this.redCards});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
     return Row(
       children: [
-        Icon(icon, color: darkBlue, size: 18),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            color: darkBlue,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.8,
+        Expanded(
+          child: _DisciplineCell(
+            label: 'Cartons jaunes',
+            value: '$yellowCards',
+            color: const Color(0xFFF59E0B),
+          ),
+        ),
+        Container(width: 1, height: 32, color: colors.divider),
+        Expanded(
+          child: _DisciplineCell(
+            label: 'Cartons rouges',
+            value: '$redCards',
+            color: AppColors.error,
           ),
         ),
       ],
     );
   }
+}
 
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-        ],
-      ),
+class _DisciplineCell extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _DisciplineCell({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 10,
+              height: 14,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              value,
+              style: TextStyle(
+                color: colors.textPrimary,
+                fontSize: 18,
+                fontWeight: context.weight(FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            color: colors.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
+}
 
-  Widget _buildPillBadge({
-    required IconData icon,
-    required String label,
-    required Color bgColor,
-    required Color textColor,
-    Color? borderColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-        border: borderColor != null ? Border.all(color: borderColor) : null,
-      ),
+class _InfoCell extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _InfoCell({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: colors.textTertiary,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.2,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 15,
+            fontWeight: context.weight(FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _DetailRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: textColor, size: 12),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: textColor,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: colors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                color: colors.textPrimary,
+                fontSize: 13.5,
+                fontWeight: context.weight(FontWeight.w600),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildStatTile({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
+class _ProfileAvatar extends StatelessWidget {
+  final String? imageUrl;
+  final double size;
+
+  const _ProfileAvatar({required this.imageUrl, this.size = 68});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
+
+    if (!hasImage) {
+      return Container(
+        color: colors.surfaceVariant,
+        child: Icon(Iconsax.user, size: size * 0.45, color: colors.iconMuted),
+      );
+    }
+
+    return Image.network(
+      imageUrl!,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        color: colors.surfaceVariant,
+        child: Icon(Iconsax.user, size: size * 0.45, color: colors.iconMuted),
+      ),
+    );
+  }
+}
+
+class _ThemeSwitchTile extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeController.instance.modeNotifier,
+      builder: (context, mode, _) {
+        final isDark = mode == ThemeMode.dark;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.accentOrange.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  isDark ? Iconsax.moon : Iconsax.sun_1,
+                  color: AppColors.accentOrange,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Thème sombre',
+                  style: TextStyle(
+                    fontWeight: context.weight(FontWeight.w700),
+                    fontSize: 15,
+                    color: colors.textPrimary,
+                  ),
+                ),
+              ),
+              Switch(
+                value: isDark,
+                activeThumbColor: Colors.white,
+                activeTrackColor: AppColors.accentOrange,
+                onChanged: (value) => ThemeController.instance.setMode(
+                  value ? ThemeMode.dark : ThemeMode.light,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+
+  const _ErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: darkBlue,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: primaryYellow.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: primaryYellow, size: 18),
+          const Icon(
+            Icons.error_outline_rounded,
+            color: AppColors.error,
+            size: 18,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white60,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+            child: Text(
+              message,
+              style: const TextStyle(color: AppColors.error, fontSize: 12),
             ),
           ),
         ],

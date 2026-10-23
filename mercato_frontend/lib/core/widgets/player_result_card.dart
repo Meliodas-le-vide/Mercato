@@ -1,36 +1,116 @@
 import 'package:flutter/material.dart';
+import 'package:mercato_frontend/core/widgets/app_snackbar.dart';
+import 'package:mercato_frontend/core/constants/app_colors.dart';
+import 'package:mercato_frontend/core/network/dio_client.dart';
+import 'package:mercato_frontend/core/state/favorite_status_bus.dart';
+import 'package:mercato_frontend/core/theme/app_theme.dart';
+import 'package:mercato_frontend/core/widgets/app_loader.dart';
+import 'package:mercato_frontend/core/widgets/glow_avatar.dart';
+import 'package:mercato_frontend/core/widgets/gold_button.dart';
+import 'package:mercato_frontend/features/player/domain/player_labels.dart';
+import 'package:mercato_frontend/features/user/data/favorite_repository.dart';
 import 'package:mercato_frontend/features/user/domain/player_search_result.dart';
 
-class PlayerResultCard extends StatelessWidget {
+class PlayerResultCard extends StatefulWidget {
   final PlayerSearchResult player;
   final VoidCallback? onTapViewProfile;
+  final ValueChanged<bool>? onFavoriteToggled;
 
   const PlayerResultCard({
     super.key,
     required this.player,
     this.onTapViewProfile,
+    this.onFavoriteToggled,
   });
 
-  static const Color darkBlue = Color(0xFF0F2137);
-  static const Color primaryYellow = Color(0xFFFFD600);
-  static const Color surfaceDark = Color(0xFF162A45);
+  @override
+  State<PlayerResultCard> createState() => _PlayerResultCardState();
+}
+
+class _PlayerResultCardState extends State<PlayerResultCard> {
+  final _favoriteRepository = FavoriteRepository(DioClient());
+  late bool _isFavorited;
+  bool _isTogglingFavorite = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isFavorited = widget.player.isFavorited;
+    FavoriteStatusBus.instance.addListener(_onFavoriteStatusChanged);
+  }
+
+  @override
+  void dispose() {
+    FavoriteStatusBus.instance.removeListener(_onFavoriteStatusChanged);
+    super.dispose();
+  }
+
+  void _onFavoriteStatusChanged() {
+    final change = FavoriteStatusBus.instance.lastChange;
+    if (change != null &&
+        change.key == widget.player.user.id &&
+        mounted &&
+        change.value != _isFavorited) {
+      setState(() => _isFavorited = change.value);
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (_isTogglingFavorite) return;
+
+    final previous = _isFavorited;
+    setState(() {
+      _isFavorited = !_isFavorited;
+      _isTogglingFavorite = true;
+    });
+
+    try {
+      final result = await _favoriteRepository.toggleFavorite(
+        widget.player.user.id,
+      );
+      if (!mounted) return;
+
+      setState(() => _isFavorited = result);
+      widget.onFavoriteToggled?.call(result);
+      FavoriteStatusBus.instance.notify(widget.player.user.id, result);
+
+      AppSnackbar.success(
+        context,
+        result
+            ? '${widget.player.fullName} ajouté aux favoris'
+            : '${widget.player.fullName} retiré des favoris',
+      );
+    } catch (e) {
+      debugPrint('Erreur toggle favorite: $e');
+      if (!mounted) return;
+      setState(() => _isFavorited = previous);
+
+      AppSnackbar.error(context, 'Action impossible, réessaie.');
+    } finally {
+      if (mounted) setState(() => _isTogglingFavorite = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = player.user.Profile_image != null && player.user.Profile_image!.isNotEmpty;
-    final positionText = player.profile.position ?? 'N/C';
-    final clubText = player.profile.currentClub ?? 'Sans club';
-    final cityText = player.profile.city;
+    final colors = context.colors;
+    final positionText = PlayerLabels.labelFor(
+      PlayerLabels.positions,
+      widget.player.profile.position,
+    );
+    final clubText = widget.player.profile.currentClub ?? 'Sans club';
+    final cityText = widget.player.profile.city;
 
     return Container(
+      height: 180,
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: darkBlue.withOpacity(0.08), width: 1),
+        border: Border.all(color: colors.border, width: 1),
         boxShadow: [
           BoxShadow(
-            color: darkBlue.withOpacity(0.06),
+            color: colors.shadow,
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -41,7 +121,7 @@ class PlayerResultCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: onTapViewProfile,
+          onTap: widget.onTapViewProfile,
           child: Padding(
             padding: const EdgeInsets.all(14.0),
             child: Column(
@@ -49,32 +129,25 @@ class PlayerResultCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Avatar avec bordure jaune
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: primaryYellow, width: 2),
-                      ),
-                      child: CircleAvatar(
-                        radius: 28,
-                        backgroundColor: darkBlue,
-                        backgroundImage: hasImage ? NetworkImage(player.user.Profile_image!) : null,
-                        child: !hasImage
-                            ? Text(
-                                player.fullName.isNotEmpty ? player.fullName[0].toUpperCase() : 'J',
-                                style: const TextStyle(
-                                  color: primaryYellow,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
-                              )
-                            : null,
+                    Hero(
+                      tag: 'player-avatar-${widget.player.user.id}',
+                      child: GlowAvatar(
+                        radius: 30,
+                        imageUrl: widget.player.user.Profile_image,
+                        placeholder: Text(
+                          widget.player.fullName.isNotEmpty
+                              ? widget.player.fullName[0].toUpperCase()
+                              : 'J',
+                          style: TextStyle(
+                            color: AppColors.accentOrange,
+                            fontWeight: context.weight(FontWeight.bold),
+                            fontSize: 18,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 14),
-                    
-                    // Informations joueur
+
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,30 +156,40 @@ class PlayerResultCard extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  player.fullName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
+                                  widget.player.fullName,
+                                  style: TextStyle(
+                                    fontWeight: context.weight(FontWeight.w800),
                                     fontSize: 16,
-                                    color: darkBlue,
+                                    color: colors.textPrimary,
                                     letterSpacing: 0.2,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              // Badge Position
+
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: darkBlue,
+                                  color: AppColors.accentOrange.withValues(
+                                    alpha: 0.15,
+                                  ),
                                   borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: AppColors.accentOrange.withValues(
+                                      alpha: 0.4,
+                                    ),
+                                  ),
                                 ),
                                 child: Text(
                                   positionText.toUpperCase(),
-                                  style: const TextStyle(
-                                    color: primaryYellow,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 10,
+                                  style: TextStyle(
+                                    color: AppColors.accentOrange,
+                                    fontWeight: context.weight(FontWeight.bold),
+                                    fontSize: 11,
                                     letterSpacing: 0.5,
                                   ),
                                 ),
@@ -114,18 +197,21 @@ class PlayerResultCard extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 6),
-                          
-                          // Ligne Club & Ville
+
                           Row(
                             children: [
-                              const Icon(Icons.shield_outlined, size: 14, color: Colors.grey),
+                              Icon(
+                                Icons.shield_outlined,
+                                size: 14,
+                                color: colors.textSecondary,
+                              ),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
                                   clubText,
                                   style: TextStyle(
-                                    color: Colors.grey.shade700,
-                                    fontSize: 13,
+                                    color: colors.textSecondary,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.w500,
                                   ),
                                   maxLines: 1,
@@ -135,30 +221,33 @@ class PlayerResultCard extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 4),
-                          
-                          // Informations secondaires (Âge, Ville)
+
                           Wrap(
                             spacing: 12,
                             children: [
-                              if (player.age != null)
+                              if (widget.player.age != null)
                                 Text(
-                                  '${player.age} ans',
+                                  '${widget.player.age} ans',
                                   style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 12,
+                                    color: colors.textSecondary,
+                                    fontSize: 13,
                                   ),
                                 ),
                               if (cityText != null && cityText.isNotEmpty)
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.location_on_outlined, size: 12, color: Colors.grey.shade600),
+                                    Icon(
+                                      Icons.location_on_outlined,
+                                      size: 12,
+                                      color: colors.textSecondary,
+                                    ),
                                     const SizedBox(width: 2),
                                     Text(
                                       cityText,
                                       style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontSize: 12,
+                                        color: colors.textSecondary,
+                                        fontSize: 13,
                                       ),
                                     ),
                                   ],
@@ -168,41 +257,52 @@ class PlayerResultCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(width: 4),
+
+                    _buildFavoriteButton(colors),
                   ],
                 ),
-                
+
                 const SizedBox(height: 12),
-                
-                // Bouton d'action bas de carte
-                Container(
-                  width: double.infinity,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: darkBlue,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.account_circle_outlined, size: 16, color: primaryYellow),
-                      SizedBox(width: 8),
-                      Text(
-                        'VOIR LE PROFIL',
-                        style: TextStyle(
-                          color: primaryYellow,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                          letterSpacing: 0.6,
-                        ),
-                      ),
-                      SizedBox(width: 4),
-                      Icon(Icons.arrow_forward_ios_rounded, size: 12, color: primaryYellow),
-                    ],
-                  ),
+
+                GoldButton(
+                  height: 40,
+                  icon: Icons.arrow_forward_rounded,
+                  label: 'Voir le profil',
+                  fontSize: 15,
+                  onPressed: widget.onTapViewProfile,
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFavoriteButton(AppSemanticColors colors) {
+    return GestureDetector(
+      onTap: _toggleFavorite,
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: colors.surfaceVariant,
+          border: Border.all(color: colors.border),
+        ),
+        child: Center(
+          child: _isTogglingFavorite
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: AppLoader(size: 14),
+                )
+              : Icon(
+                  _isFavorited ? Icons.favorite : Icons.favorite_border,
+                  size: 20,
+                  color: _isFavorited ? AppColors.error : colors.iconMuted,
+                ),
         ),
       ),
     );

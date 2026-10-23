@@ -31,7 +31,9 @@ exports.toggleFavorite = async (req, res) => {
         recipientId: playerId,
         actorId: userId,
         type: 'NEW_FAVORITE',
-        message: `${fan?.firstname ?? 'Un fan'} ${fan?.lastname ?? ''}`.trim() + ' t\'a ajouté à ses favoris.',
+        message:
+          `${fan?.firstname ?? 'Un fan'} ${fan?.lastname ?? ''}`.trim() +
+          ' t\'a ajouté à ses favoris.',
       });
 
       return res.status(201).json({ favorited: true });
@@ -62,9 +64,23 @@ exports.getMyFavorites = async (req, res) => {
 
     const playerIds = favorites.map((f) => f.playerId);
 
+    // Si aucun favori → on évite une requête IN [] inutile
+    if (playerIds.length === 0) {
+      return res.status(200).json({
+        data: [],
+        pagination: { total: 0, page, limit, totalPages: 0 },
+      });
+    }
+
     const profiles = await PlayerProfile.findAll({
       where: { userId: playerIds },
-      include: [{ model: User, attributes: ['id', 'firstname', 'lastname', 'Profile_image'] }],
+      include: [
+        {
+          model: User,
+          as: 'user', 
+          attributes: ['id', 'firstname', 'lastname', 'Profile_image'],
+        },
+      ],
     });
 
     // PlayerProfile.findAll(IN ...) ne garantit pas l'ordre : on retrie selon
@@ -93,12 +109,14 @@ exports.getMyFavorites = async (req, res) => {
       cardsYellow: profile.cardsYellow || 0,
       cardsRed: profile.cardsRed || 0,
       isProfileComplete: profile.isProfileComplete,
-      User: {
-        id: profile.User.id,
-        firstname: profile.User.firstname,
-        lastname: profile.User.lastname,
-        Profile_image: profile.User.Profile_image,
-      },
+      User: profile.user
+        ? {
+            id: profile.user.id,
+            firstname: profile.user.firstname,
+            lastname: profile.user.lastname,
+            Profile_image: profile.user.Profile_image,
+          }
+        : {},
       isFavorited: true,
     }));
 

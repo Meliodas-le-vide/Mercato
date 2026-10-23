@@ -1,8 +1,32 @@
 const { Op } = require('sequelize');
-const { Video, VideoLike, VideoComment, User, Favorite, Notification } = require('../models/index');
+const { Video, VideoLike, VideoComment, User, Favorite, Notification, PlayerProfile } = require('../models/index');
 const cloudinary = require('../../config/cloudinary');
 
 const PUBLIC_AUTHOR_ATTRS = ['id', 'firstname', 'lastname', 'Profile_image', 'role'];
+
+/**
+ * Inclusion de l'auteur avec le poste de son profil joueur.
+ * Si `positions` est fourni, seules les vidéos dont l'auteur occupe
+ * l'un de ces postes sont gardées (jointure obligatoire).
+ */
+function authorInclude(positions) {
+  const filtered = Array.isArray(positions) && positions.length > 0;
+  return {
+    model: User,
+    as: 'author',
+    attributes: PUBLIC_AUTHOR_ATTRS,
+    required: filtered,
+    include: [
+      {
+        model: PlayerProfile,
+        as: 'playerProfile',
+        attributes: ['position'],
+        required: filtered,
+        ...(filtered ? { where: { position: { [Op.in]: positions } } } : {}),
+      },
+    ],
+  };
+}
 
 /**
  * Ajoute `isLiked` (bool) à une liste de vidéos, calculé pour l'utilisateur courant,
@@ -21,6 +45,10 @@ async function attachIsLiked(videos, userId) {
   const withFlag = list.map((v) => {
     const plain = v.toJSON();
     plain.isLiked = likedIds.has(v.id);
+    // Le poste affiché/filtré est celui du profil actuel de l'auteur.
+    const authorPosition = plain.author?.playerProfile?.position;
+    if (authorPosition) plain.position = authorPosition;
+    if (plain.author) delete plain.author.playerProfile;
     return plain;
   });
 
@@ -50,7 +78,9 @@ async function notifyFansOfNewVideo(video) {
 
 /**
  * GET /api/v1/videos/feed
- * Query params: filter=trending|recent|position, position=<ENUM>, page, limit
+ * Query params: filter=trending|recent, page, limit,
+ *   position=<ENUM> ou liste séparée par des virgules (ex : LATERAL_DROIT,LATERAL_GAUCHE)
+ *   → vidéos dont l'AUTEUR occupe ce poste dans son profil joueur.
  */
 exports.getFeed = async (req, res) => {
   try {
@@ -59,8 +89,10 @@ exports.getFeed = async (req, res) => {
     const offset = (page - 1) * limit;
     const { filter, position } = req.query;
 
-    const where = {};
-    if (position) where.position = position;
+    // Filtre sur le poste du profil de l'auteur (et non sur la vidéo).
+    const positions = position
+      ? String(position).split(',').map((p) => p.trim()).filter(Boolean)
+      : [];
 
     let order = [['createdAt', 'DESC']]; // défaut : récent
     if (filter === 'trending') {
@@ -68,11 +100,11 @@ exports.getFeed = async (req, res) => {
     }
 
     const { count, rows } = await Video.findAndCountAll({
-      where,
       order,
       limit,
       offset,
-      include: [{ model: User, as: 'author', attributes: PUBLIC_AUTHOR_ATTRS }],
+      distinct: true,
+      include: [authorInclude(positions)],
     });
 
     const data = await attachIsLiked(rows, req.user.userId);
@@ -98,7 +130,7 @@ exports.getFeed = async (req, res) => {
 exports.getVideoById = async (req, res) => {
   try {
     const video = await Video.findByPk(req.params.id, {
-      include: [{ model: User, as: 'author', attributes: PUBLIC_AUTHOR_ATTRS }],
+      include: [authorInclude()],
     });
 
     if (!video) {
@@ -353,7 +385,7 @@ exports.getVideosByPlayer = async (req, res) => {
       order: [['createdAt', 'DESC']],
       limit,
       offset,
-      include: [{ model: User, as: 'author', attributes: PUBLIC_AUTHOR_ATTRS }],
+      include: [authorInclude()],
     });
 
     const data = await attachIsLiked(rows, req.user.userId);

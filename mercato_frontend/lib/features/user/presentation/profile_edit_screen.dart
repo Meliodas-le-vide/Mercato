@@ -1,10 +1,18 @@
 import 'dart:convert';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:mercato_frontend/core/widgets/app_snackbar.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:mercato_frontend/core/constants/app_colors.dart';
 import 'package:mercato_frontend/core/network/dio_client.dart';
+import 'package:mercato_frontend/core/theme/app_theme.dart';
+import 'package:mercato_frontend/core/widgets/app_loader.dart';
+import 'package:mercato_frontend/core/widgets/app_text_field.dart';
 import 'package:mercato_frontend/core/widgets/player_avatar_picker.dart';
 import 'package:mercato_frontend/features/player/data/player_repository.dart';
 import 'package:mercato_frontend/features/player/domain/player_profile_model.dart';
+
 import '../../auth/domain/user_model.dart';
 
 class ProfileEditScreen extends StatefulWidget {
@@ -15,14 +23,12 @@ class ProfileEditScreen extends StatefulWidget {
 }
 
 class _ProfileEditScreenState extends State<ProfileEditScreen> {
-  static const Color primaryYellow = Color(0xFFFFD600);
-  static const Color darkBlue = Color(0xFF0F2137);
-
   final _repository = PlayerProfileRepository(DioClient());
   final _storage = const FlutterSecureStorage();
 
   final _firstnameController = TextEditingController();
   final _lastnameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _cityController = TextEditingController();
   final _countryController = TextEditingController();
@@ -43,6 +49,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   void dispose() {
     _firstnameController.dispose();
     _lastnameController.dispose();
+    _emailController.dispose();
     _phoneController.dispose();
     _cityController.dispose();
     _countryController.dispose();
@@ -58,13 +65,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         _currentUser = UserModel.fromJson(jsonDecode(userJson));
         _firstnameController.text = _currentUser?.firstname ?? '';
         _lastnameController.text = _currentUser?.lastname ?? '';
+        _emailController.text = _currentUser?.email ?? '';
         _phoneController.text = _currentUser?.phone ?? '';
         _avatarUrl = _currentUser?.Profile_image;
       }
 
-   
+      try {
+        final profile = await _repository.getMe();
+        _cityController.text = profile.city ?? '';
+        _countryController.text = profile.country ?? '';
+      } on DioException catch (e) {
+        // Pas encore de profil joueur (ex : simple "fan") : rien à préremplir.
+        if (e.response?.statusCode != 404) rethrow;
+      }
     } catch (_) {
-      // Ignoré si le profil joueur n'existe pas encore en base
+      // Silencieux : l'utilisateur pourra quand même éditer
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -87,13 +102,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       Profile_image: newUrl,
     );
 
-    await _storage.write(key: 'user_data', value: jsonEncode(updatedUser.toJson()));
+    await _storage.write(
+      key: 'user_data',
+      value: jsonEncode(updatedUser.toJson()),
+    );
   }
 
   Future<void> _handleSave() async {
-    if (_firstnameController.text.trim().isEmpty || _lastnameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Le prénom et le nom sont obligatoires')),
+    if (_firstnameController.text.trim().isEmpty ||
+        _lastnameController.text.trim().isEmpty) {
+      _showSnackBar(
+        message: 'Le prénom et le nom sont obligatoires',
+        isError: true,
       );
       return;
     }
@@ -101,15 +121,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     setState(() => _isSaving = true);
 
     try {
-      // Sauvegarde des infos de localisation simples
       final profile = PlayerProfileModel(
         userId: _currentUser?.id ?? 0,
-        city: _cityController.text.trim().isEmpty ? null : _cityController.text.trim(),
-        country: _countryController.text.trim().isEmpty ? null : _countryController.text.trim(),
+        city: _cityController.text.trim().isEmpty
+            ? null
+            : _cityController.text.trim(),
+        country: _countryController.text.trim().isEmpty
+            ? null
+            : _countryController.text.trim(),
       );
       await _repository.updateMe(profile);
 
-      // Mise à jour du cache utilisateur local (User)
       if (_currentUser != null) {
         final updatedUser = UserModel(
           id: _currentUser!.id,
@@ -120,137 +142,183 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           role: _currentUser!.role,
           Profile_image: _avatarUrl,
         );
-        await _storage.write(key: 'user_data', value: jsonEncode(updatedUser.toJson()));
+        await _storage.write(
+          key: 'user_data',
+          value: jsonEncode(updatedUser.toJson()),
+        );
       }
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profil mis à jour avec succès !')),
-      );
+      _showSnackBar(message: 'Profil mis à jour avec succès !', isError: false);
 
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erreur lors de l\'enregistrement du profil')),
+
+      _showSnackBar(
+        message: 'Erreur lors de l\'enregistrement du profil',
+        isError: true,
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
+  /// Affiche un snackbar en haut de l'écran.
+  void _showSnackBar({required String message, required bool isError}) {
+    if (isError) {
+      AppSnackbar.error(context, message);
+    } else {
+      AppSnackbar.success(context, message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(child: CircularProgressIndicator(color: darkBlue)),
+      return Scaffold(
+        backgroundColor: colors.background,
+        body: const Center(child: AppLoader()),
       );
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: darkBlue,
+        automaticallyImplyLeading: false,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        backgroundColor: colors.surface,
+        titleSpacing: 12,
+        toolbarHeight: 64,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, color: colors.icon, size: 18),
           onPressed: () => Navigator.pop(context, false),
         ),
-        title: const Text(
-          'ÉDITER LE PROFIL',
-          style: TextStyle(color: primaryYellow, fontSize: 16, fontWeight: FontWeight.bold),
+        title: Text(
+          'MODIFIER LE PROFILE',
+          style: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 18,
+            fontWeight: context.weight(FontWeight.w700),
+            letterSpacing: -0.3,
+          ),
         ),
-        centerTitle: true,
       ),
       body: SafeArea(
+        top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              PlayerAvatarPicker(
-                initialAvatarUrl: _avatarUrl,
-                onAvatarUpdated: _handleAvatarUpdated,
-              ),
-              const SizedBox(height: 24),
-
-              _buildTextField(_firstnameController, 'Prénom *', Icons.person_outline),
-              const SizedBox(height: 12),
-
-              _buildTextField(_lastnameController, 'Nom *', Icons.person_outline),
-              const SizedBox(height: 12),
-
-              _buildTextField(
-                _phoneController,
-                'Téléphone',
-                Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 12),
-
-              Row(
-                children: [
-                  Expanded(child: _buildTextField(_cityController, 'Ville', Icons.location_city_outlined)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildTextField(_countryController, 'Pays', Icons.public_outlined)),
-                ],
+              Center(
+                child: PlayerAvatarPicker(
+                  initialAvatarUrl: _avatarUrl,
+                  onAvatarUpdated: _handleAvatarUpdated,
+                ),
               ),
               const SizedBox(height: 32),
 
-              ElevatedButton(
-                onPressed: _isSaving ? null : _handleSave,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: darkBlue,
-                  foregroundColor: primaryYellow,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              AppTextField(
+                controller: _firstnameController,
+                label: 'Prénom',
+                icon: Icons.person_outline_rounded,
+                required: true,
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: _lastnameController,
+                label: 'Nom',
+                icon: Icons.badge_outlined,
+                required: true,
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: _emailController,
+                label: 'Email',
+                icon: Icons.mail_outline_rounded,
+                keyboardType: TextInputType.emailAddress,
+                readOnly: true,
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: _phoneController,
+                label: 'Téléphone',
+                icon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: _cityController,
+                label: 'Ville',
+                icon: Icons.location_city_outlined,
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: _countryController,
+                label: 'Pays',
+                icon: Icons.public_rounded,
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 32),
+
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton(
+                  onPressed: _isSaving ? null : _handleSave,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.textPrimary,
+                    foregroundColor: colors.background,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isSaving
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: AppLoader(
+                            size: 20,
+                            color: AppColors.accentOrange,
+                          ),
+                        )
+                      : Text(
+                          'Enregistrer',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: context.weight(FontWeight.w600),
+                            letterSpacing: 0.2,
+                          ),
+                        ),
                 ),
-                child: _isSaving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: primaryYellow),
-                      )
-                    : const Text(
-                        'ENREGISTRER',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.0),
-                      ),
               ),
               const SizedBox(height: 8),
 
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Annuler', style: TextStyle(color: Colors.black54, fontSize: 13)),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: Text(
+                  'Annuler',
+                  style: TextStyle(
+                    color: colors.textSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField(
-    TextEditingController controller,
-    String hint,
-    IconData icon, {
-    TextInputType? keyboardType,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      style: const TextStyle(color: darkBlue, fontSize: 14),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Colors.black38, fontSize: 13),
-        fillColor: const Color(0xFFF4F6F8),
-        filled: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        suffixIcon: Icon(icon, color: darkBlue.withOpacity(0.5), size: 20),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
         ),
       ),
     );

@@ -1,10 +1,12 @@
 import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:mercato_frontend/features/auth/domain/user_model.dart';
 import 'package:mercato_frontend/features/user/domain/video_model.dart';
+
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/dio_client.dart';
 import '../domain/player_profile_model.dart';
-
 
 class PlayerProfileRepository {
   final DioClient _dioClient;
@@ -17,13 +19,36 @@ class PlayerProfileRepository {
     return PlayerProfileModel.fromJson(response.data['data']);
   }
 
-  /// Met à jour (ou crée, si premier remplissage) le profil joueur
-  Future<PlayerProfileModel> updateMe(PlayerProfileModel profile) async {
+  /// Indique si le joueur connecté a rempli les champs obligatoires de son
+  /// profil (poste, niveau, date de naissance, ville).
+  /// Profil inexistant (404) → false. Autre erreur (réseau…) → true, pour
+  /// ne pas bloquer l'accès à l'app à cause d'un souci de connexion.
+  Future<bool> isProfileComplete() async {
+    try {
+      final profile = await getMe();
+      return profile.isProfileComplete;
+    } on DioException catch (e) {
+      return e.response?.statusCode != 404;
+    }
+  }
+
+  /// Met à jour (ou crée, si premier remplissage) le profil joueur.
+  /// Si un simple utilisateur ("fan") vient de compléter son profil, le
+  /// backend le promeut automatiquement au rôle PLAYER : `user` reflète
+  /// alors ce nouveau rôle pour que l'appelant resynchronise le cache local.
+  Future<({PlayerProfileModel profile, UserModel? user})> updateMe(
+    PlayerProfileModel profile,
+  ) async {
     final response = await _dioClient.dio.put(
       ApiEndpoints.playerMe,
       data: profile.toUpdateJson(),
     );
-    return PlayerProfileModel.fromJson(response.data['data']);
+    return (
+      profile: PlayerProfileModel.fromJson(response.data['data']),
+      user: response.data['user'] != null
+          ? UserModel.fromJson(response.data['user'])
+          : null,
+    );
   }
 
   /// Upload de la photo de profil

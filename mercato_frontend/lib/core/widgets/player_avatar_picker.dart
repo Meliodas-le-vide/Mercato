@@ -1,9 +1,12 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:mercato_frontend/core/widgets/app_snackbar.dart';
 import 'package:image_picker/image_picker.dart';
+
+import 'package:mercato_frontend/core/constants/app_colors.dart';
+import 'package:mercato_frontend/core/network/dio_client.dart';
 import 'package:mercato_frontend/features/player/data/player_repository.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/network/dio_client.dart';
 
 class PlayerAvatarPicker extends StatefulWidget {
   final String? initialAvatarUrl;
@@ -38,7 +41,8 @@ class _PlayerAvatarPickerState extends State<PlayerAvatarPicker> {
     super.didUpdateWidget(oldWidget);
     // Si le profil parent finit de charger après ce widget (cas fréquent avec un FutureBuilder
     // externe), on récupère la nouvelle URL initiale une fois qu'elle arrive.
-    if (oldWidget.initialAvatarUrl != widget.initialAvatarUrl && _localFile == null) {
+    if (oldWidget.initialAvatarUrl != widget.initialAvatarUrl &&
+        _localFile == null) {
       _avatarUrl = widget.initialAvatarUrl;
     }
   }
@@ -61,16 +65,26 @@ class _PlayerAvatarPickerState extends State<PlayerAvatarPicker> {
       if (!mounted) return;
       setState(() => _avatarUrl = newUrl);
       widget.onAvatarUpdated(newUrl);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Photo de profil mise à jour !')),
-      );
+
+      _showSnackBar(message: 'Photo de profil mise à jour !', isError: false);
     } catch (e) {
+      debugPrint('Erreur upload avatar: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erreur lors de l\'upload de la photo')),
+      _showSnackBar(
+        message: 'Erreur lors de l\'upload de la photo',
+        isError: true,
       );
     } finally {
       if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  /// Affiche un snackbar en haut de l'écran (helper centralisé).
+  void _showSnackBar({required String message, required bool isError}) {
+    if (isError) {
+      AppSnackbar.error(context, message);
+    } else {
+      AppSnackbar.success(context, message);
     }
   }
 
@@ -86,20 +100,29 @@ class _PlayerAvatarPickerState extends State<PlayerAvatarPicker> {
     return Center(
       child: Stack(
         children: [
+          // -------- Avatar cercle --------
           Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.primaryNeon, width: 2),
+              border: Border.all(color: AppColors.accentOrange, width: 2),
             ),
             child: CircleAvatar(
-              radius: 48,
+              radius: 50,
+              // ⚠️ Fond sombre bleuté volontaire : c'est le style du fallback
+              // avatar (avec l'anneau orange), cohérent dans les 2 thèmes.
               backgroundColor: const Color(0xFF1E2638),
               backgroundImage: backgroundImage,
               child: backgroundImage == null
-                  ? const Icon(Icons.person, size: 48, color: Colors.white54)
+                  ? Icon(
+                      Icons.person,
+                      size: 48,
+                      color: Colors.white.withValues(alpha: 0.54),
+                    )
                   : null,
             ),
           ),
+
+          // -------- Bouton caméra --------
           Positioned(
             bottom: 0,
             right: 0,
@@ -108,16 +131,23 @@ class _PlayerAvatarPickerState extends State<PlayerAvatarPicker> {
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: const BoxDecoration(
-                  color: AppColors.primaryNeon,
+                  color: AppColors.accentOrange,
                   shape: BoxShape.circle,
                 ),
                 child: _isUploading
                     ? const SizedBox(
                         height: 14,
                         width: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.onGold,
+                        ),
                       )
-                    : const Icon(Icons.camera_alt, size: 16, color: Colors.black),
+                    : const Icon(
+                        Icons.camera_alt,
+                        size: 16,
+                        color: AppColors.onGold,
+                      ),
               ),
             ),
           ),

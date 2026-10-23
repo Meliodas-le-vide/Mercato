@@ -8,12 +8,24 @@ const favoriteRoutes = require('./src/routes/favoriteRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
 const reportRoutes = require('./src/routes/reportRoutes');
 const adminRoutes = require('./src/routes/adminRoutes');
-cloudinary = require('./config/cloudinary');
+const messageRoutes = require('./src/routes/messageRoutes');
+const eventRoutes = require('./src/routes/eventRoutes')
+const cloudinary = require('./config/cloudinary');
 require('dotenv').config();
+const cors = require('cors');  
+
 
 const app = express();
+
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://localhost:5000'],
+  credentials: true,
+}));
+
 app.use(express.json());
-app.use('/api/auth', authRoutes);
+
+
+app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/players', playerProfileRoutes);
 app.use('/api/v1/recruiter', recruiterProfileRoutes);
 app.use('/api/v1/videos', videoRoutes);
@@ -21,6 +33,11 @@ app.use('/api/v1/favorites', favoriteRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/messages', messageRoutes);
+app.use('/api/v1/events', eventRoutes);
+
+
+
 
 app.use((err, req, res, next) => {
   console.error('=== Erreur non gérée ===');
@@ -33,13 +50,17 @@ app.use((err, req, res, next) => {
   res.status(err?.status || err?.http_code || 500).json({ error: message });
 });
 
+const PORT = process.env.PORT || 5000;
 
 
 sequelize
-.sync()
+.sync({alter:true})
 .then(()=> {
     console.log('Database synced');
-    app.listen( process.env.PORT, ()=> {
-        console.log(`server running on port ${process.env.PORT}`);
-    })
-}).catch(console.error);
+    const http = require('http');
+    const { initSocket } = require('./src/utils/socket');
+    const server = http.createServer(app);
+    initSocket(server);
+    server.listen(PORT, () => console.log(`Server running on ${PORT}`));
+})
+.catch(console.error);

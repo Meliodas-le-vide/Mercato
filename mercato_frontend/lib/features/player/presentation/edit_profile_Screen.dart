@@ -1,13 +1,21 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:mercato_frontend/core/widgets/app_snackbar.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:mercato_frontend/core/widgets/app_loader.dart';
+import 'package:mercato_frontend/core/widgets/app_text_field.dart';
+import 'package:mercato_frontend/core/widgets/gold_button.dart';
+import 'package:mercato_frontend/core/widgets/pitch_position_picker.dart';
 import 'package:mercato_frontend/core/widgets/player_avatar_picker.dart';
 import 'package:mercato_frontend/features/player/data/player_repository.dart';
+import 'package:mercato_frontend/features/player/domain/player_labels.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/theme/app_theme.dart';
 import '../domain/player_profile_model.dart';
 import '../../auth/domain/user_model.dart';
-
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -36,47 +44,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isLoading = false;
   bool _isSaving = false;
 
-  static const Map<String, String> _positions = {
-    'GARDIEN': 'Gardien',
-    'DEFENSEUR_CENTRAL': 'Défenseur central',
-    'LATERAL_DROIT': 'Latéral droit',
-    'LATERAL_GAUCHE': 'Latéral gauche',
-    'MILIEU_DEFENSIF': 'Milieu défensif',
-    'MILIEU_CENTRAL': 'Milieu central',
-    'MILIEU_OFFENSIF': 'Milieu offensif',
-    'AILIER_DROIT': 'Ailier droit',
-    'AILIER_GAUCHE': 'Ailier gauche',
-    'ATTAQUANT': 'Attaquant',
-  };
-
-  static const Map<String, String> _feet = {
-    'DROIT': 'Droit',
-    'GAUCHE': 'Gauche',
-    'AMBIDEXTRE': 'Ambidextre',
-  };
-
-  static const Map<String, String> _levels = {
-    'AMATEUR': 'Amateur',
-    'SEMI_PRO': 'Semi-professionnel',
-    'PRO': 'Professionnel',
-  };
-
   @override
   void initState() {
     super.initState();
     _loadExistingProfile();
   }
 
-  /// Précharge le profil existant (toujours le cas ici, puisqu'on édite)
+  @override
+  void dispose() {
+    _clubController.dispose();
+    _cityController.dispose();
+    _countryController.dispose();
+    _bioController.dispose();
+    _heightController.dispose();
+    _weightController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadExistingProfile() async {
     setState(() => _isLoading = true);
     try {
       final profile = await _repository.getMe();
+      if (!mounted) return;
       setState(() {
         _selectedPosition = profile.position;
         _selectedFoot = profile.strongFoot;
         _selectedLevel = profile.level;
-        _birthDate = profile.birthDate != null ? DateTime.tryParse(profile.birthDate!) : null;
+        _birthDate = profile.birthDate != null
+            ? DateTime.tryParse(profile.birthDate!)
+            : null;
         _clubController.text = profile.currentClub ?? '';
         _cityController.text = profile.city ?? '';
         _countryController.text = profile.country ?? '';
@@ -88,20 +84,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Cas rare : profil supprimé entre-temps -> formulaire vide
     }
 
-    // Avatar : chargé depuis le cache local (mis à jour à chaque login/register/upload)
     try {
       final userJson = await _storage.read(key: 'user_data');
       if (userJson != null) {
         final user = UserModel.fromJson(jsonDecode(userJson));
-        setState(() => _avatarUrl = user.Profile_image);
+        if (mounted) setState(() => _avatarUrl = user.Profile_image);
       }
     } catch (_) {}
 
     if (mounted) setState(() => _isLoading = false);
   }
 
-  /// Met à jour le cache local user_data avec la nouvelle URL d'avatar,
-  /// pour que PlayerProfileScreen affiche la nouvelle photo sans appel réseau.
   Future<void> _handleAvatarUpdated(String newUrl) async {
     setState(() => _avatarUrl = newUrl);
 
@@ -119,26 +112,47 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       Profile_image: newUrl,
     );
 
-    await _storage.write(key: 'user_data', value: jsonEncode(updatedUser.toJson()));
+    await _storage.write(
+      key: 'user_data',
+      value: jsonEncode(updatedUser.toJson()),
+    );
   }
 
   Future<void> _pickBirthDate() async {
     final now = DateTime.now();
+    final colors = context.colors;
+
     final picked = await showDatePicker(
       context: context,
       initialDate: _birthDate ?? DateTime(now.year - 18),
       firstDate: DateTime(now.year - 60),
       lastDate: DateTime(now.year - 5),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppColors.accentOrange,
+              brightness: Theme.of(context).brightness,
+            ),
+            dialogBackgroundColor: colors.surface,
+          ),
+          child: child!,
+        );
+      },
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() => _birthDate = picked);
     }
   }
 
   Future<void> _handleSave() async {
-    if (_selectedPosition == null || _selectedLevel == null || _birthDate == null || _cityController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Poste, niveau, date de naissance et ville sont obligatoires')),
+    if (_selectedPosition == null ||
+        _selectedLevel == null ||
+        _birthDate == null ||
+        _cityController.text.trim().isEmpty) {
+      _showSnackBar(
+        message: 'Poste, niveau, date de naissance et ville sont obligatoires',
+        isError: true,
       );
       return;
     }
@@ -147,15 +161,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     try {
       final profile = PlayerProfileModel(
-        userId: 0, // ignoré à l'update, le backend utilise le token
+        userId: 0,
         position: _selectedPosition,
         strongFoot: _selectedFoot,
         birthDate: _birthDate!.toIso8601String().split('T').first,
         level: _selectedLevel,
-        currentClub: _clubController.text.trim().isEmpty ? null : _clubController.text.trim(),
+        currentClub: _clubController.text.trim().isEmpty
+            ? null
+            : _clubController.text.trim(),
         city: _cityController.text.trim(),
-        country: _countryController.text.trim().isEmpty ? null : _countryController.text.trim(),
-        bio: _bioController.text.trim().isEmpty ? null : _bioController.text.trim(),
+        country: _countryController.text.trim().isEmpty
+            ? null
+            : _countryController.text.trim(),
+        bio: _bioController.text.trim().isEmpty
+            ? null
+            : _bioController.text.trim(),
         height: int.tryParse(_heightController.text.trim()),
         weight: int.tryParse(_weightController.text.trim()),
       );
@@ -164,218 +184,233 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profil mis à jour !')),
-      );
-
-      // Toujours poussé depuis l'écran profil -> on revient dessus avec le signal de rafraîchissement.
+      _showSnackBar(message: 'Profil mis à jour !', isError: false);
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erreur lors de l\'enregistrement du profil')),
+      _showSnackBar(
+        message: 'Erreur lors de l\'enregistrement du profil',
+        isError: true,
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
+  void _showSnackBar({required String message, required bool isError}) {
+    if (isError) {
+      AppSnackbar.error(context, message);
+    } else {
+      AppSnackbar.success(context, message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF0A0E1A),
-        body: Center(child: CircularProgressIndicator(color: AppColors.primaryNeon)),
+      return Scaffold(
+        backgroundColor: colors.background,
+        body: const Center(child: AppLoader()),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E1A),
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0A0E1A),
-        title: const Text('Éditer ton profil', style: TextStyle(color: Colors.white)),
+        automaticallyImplyLeading: false,
         elevation: 0,
-              leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        backgroundColor: colors.surface,
+        titleSpacing: 12,
+        toolbarHeight: 64,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new, color: colors.icon, size: 18),
           onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Modifier le profil',
+          style: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 20,
+            fontWeight: context.weight(FontWeight.w700),
+            letterSpacing: -0.3,
+          ),
         ),
       ),
       body: SafeArea(
+        top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              PlayerAvatarPicker(
-                initialAvatarUrl: _avatarUrl,
-                onAvatarUpdated: _handleAvatarUpdated,
+              // ============================================================
+              // PHOTO + INTRO
+              // ============================================================
+              Center(
+                child: PlayerAvatarPicker(
+                  initialAvatarUrl: _avatarUrl,
+                  onAvatarUpdated: _handleAvatarUpdated,
+                ),
               ),
               const SizedBox(height: 20),
-
-              const Text(
+              Text(
                 'Ces informations seront visibles par les recruteurs.',
-                style: TextStyle(color: Colors.white54, fontSize: 12),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: colors.textSecondary,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              // ============================================================
+              // SECTION : POSTE
+              // ============================================================
+              Text.rich(
+                TextSpan(
+                  text: 'Poste principal',
+                  children: const [
+                    TextSpan(
+                      text: ' *',
+                      style: TextStyle(color: AppColors.error),
+                    ),
+                  ],
+                ),
+                style: TextStyle(
+                  color: colors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: context.weight(FontWeight.w600),
+                ),
+              ),
+              const SizedBox(height: 8),
+              PitchPositionPicker(
+                selected: _selectedPosition,
+                onChanged: (v) => setState(() => _selectedPosition = v),
               ),
               const SizedBox(height: 20),
 
-              _buildDropdown('Poste *', _selectedPosition, _positions, (v) => setState(() => _selectedPosition = v)),
-              const SizedBox(height: 12),
-
-              _buildDropdown('Pied fort', _selectedFoot, _feet, (v) => setState(() => _selectedFoot = v)),
-              const SizedBox(height: 12),
-
-              _buildDropdown('Niveau *', _selectedLevel, _levels, (v) => setState(() => _selectedLevel = v)),
-              const SizedBox(height: 12),
-
-              GestureDetector(
+              AppDropdownField(
+                label: 'Niveau',
+                icon: Icons.emoji_events_outlined,
+                required: true,
+                value: _selectedLevel,
+                options: PlayerLabels.levels,
+                onChanged: (v) => setState(() => _selectedLevel = v),
+              ),
+              const SizedBox(height: 16),
+              AppDateField(
+                label: 'Date de naissance',
+                icon: Icons.cake_outlined,
+                required: true,
+                value: _birthDate,
                 onTap: _pickBirthDate,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E2638),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _birthDate == null
-                            ? 'Date de naissance *'
-                            : '${_birthDate!.day}/${_birthDate!.month}/${_birthDate!.year}',
-                        style: TextStyle(
-                          color: _birthDate == null ? Colors.white38 : Colors.white,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const Icon(Icons.calendar_today, color: Colors.white54, size: 18),
-                    ],
-                  ),
-                ),
               ),
-              const SizedBox(height: 12),
-
-              _buildTextField(_clubController, 'Club actuel (optionnel)', Icons.shield_outlined),
-              const SizedBox(height: 12),
-
-              Row(
-                children: [
-                  Expanded(child: _buildTextField(_cityController, 'Ville *', Icons.location_on_outlined)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildTextField(_countryController, 'Pays', Icons.public)),
-                ],
+              const SizedBox(height: 16),
+              AppDropdownField(
+                label: 'Pied fort',
+                icon: Icons.directions_run_rounded,
+                value: _selectedFoot,
+                options: PlayerLabels.feet,
+                onChanged: (v) => setState(() => _selectedFoot = v),
               ),
-              const SizedBox(height: 12),
-
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: _cityController,
+                label: 'Ville',
+                icon: Icons.location_city_outlined,
+                required: true,
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: _countryController,
+                label: 'Pays',
+                icon: Icons.public_rounded,
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: _clubController,
+                label: 'Club actuel',
+                hint: 'Optionnel',
+                icon: Icons.shield_outlined,
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 16),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: _buildTextField(_heightController, 'Taille (cm)', Icons.height,
-                        keyboardType: TextInputType.number),
+                    child: AppTextField(
+                      controller: _heightController,
+                      label: 'Taille (cm)',
+                      hint: 'Ex : 178',
+                      icon: Icons.height_rounded,
+                      keyboardType: TextInputType.number,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildTextField(_weightController, 'Poids (kg)', Icons.monitor_weight_outlined,
-                        keyboardType: TextInputType.number),
+                    child: AppTextField(
+                      controller: _weightController,
+                      label: 'Poids (kg)',
+                      hint: 'Ex : 72',
+                      icon: Icons.monitor_weight_outlined,
+                      keyboardType: TextInputType.number,
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-
-              TextField(
+              const SizedBox(height: 16),
+              AppTextField(
                 controller: _bioController,
-                maxLines: 4,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Parle un peu de toi, de ton parcours...',
-                  hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-                  fillColor: const Color(0xFF1E2638),
-                  filled: true,
-                  contentPadding: const EdgeInsets.all(16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
+                label: 'Bio',
+                hint: 'Parle un peu de toi, de ton parcours…',
+                maxLines: 5,
+                textCapitalization: TextCapitalization.sentences,
+              ),
+              const SizedBox(height: 32),
+
+              // ============================================================
+              // TON GoldButton CONSERVÉ
+              // ============================================================
+              SizedBox(
+                width: double.infinity,
+                child: GoldButton(
+                  height: 52,
+                  fontSize: 15,
+                  icon: Icons.check_rounded,
+                  label: 'Enregistrer les modifications',
+                  loading: _isSaving,
+                  onPressed: _isSaving ? null : _handleSave,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
 
-              ElevatedButton(
-                onPressed: _isSaving ? null : _handleSave,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryNeon,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.all(16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: _isSaving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
-                      )
-                    : const Text('Enregistrer les modifications', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(height: 12),
-
+              // ============================================================
+              // ANNULER
+              // ============================================================
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: Text(
                   'Annuler',
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                  style: TextStyle(
+                    color: colors.textSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField(TextEditingController controller, String hint, IconData icon,
-      {TextInputType? keyboardType}) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.white, fontSize: 14),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-        fillColor: const Color(0xFF1E2638),
-        filled: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        suffixIcon: Icon(icon, color: Colors.white54, size: 20),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDropdown(
-    String hint,
-    String? value,
-    Map<String, String> options,
-    void Function(String?) onChanged,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E2638),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          hint: Text(hint, style: const TextStyle(color: Colors.white38, fontSize: 13)),
-          isExpanded: true,
-          dropdownColor: const Color(0xFF1E2638),
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          icon: const Icon(Icons.arrow_drop_down, color: Colors.white54),
-          items: options.entries
-              .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-              .toList(),
-          onChanged: onChanged,
         ),
       ),
     );

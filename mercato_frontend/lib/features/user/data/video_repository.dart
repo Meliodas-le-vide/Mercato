@@ -1,7 +1,10 @@
 import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:mercato_frontend/core/network/paginated_result.dart';
 import 'package:mercato_frontend/features/user/domain/video_comment_model.dart';
 import 'package:mercato_frontend/features/user/domain/video_model.dart';
+
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/dio_client.dart';
 
@@ -11,7 +14,7 @@ class VideoRepository {
   VideoRepository(this._dioClient);
 
   /// Feed paginé. filter: 'trending' | 'recent' (défaut serveur). position: filtre optionnel par poste.
-  Future<List<VideoModel>> getFeed({
+  Future<PaginatedResult<VideoModel>> getFeed({
     String? filter,
     String? position,
     int page = 1,
@@ -27,8 +30,7 @@ class VideoRepository {
       },
     );
 
-    final List data = response.data['data'];
-    return data.map((json) => VideoModel.fromJson(json)).toList();
+    return PaginatedResult.fromJson(response.data, VideoModel.fromJson);
   }
 
   Future<VideoModel> getVideoById(int id) async {
@@ -46,18 +48,23 @@ class VideoRepository {
   }
 
   Future<int> incrementViews(int videoId) async {
-    final response = await _dioClient.dio.post(ApiEndpoints.videoViews(videoId));
+    final response = await _dioClient.dio.post(
+      ApiEndpoints.videoViews(videoId),
+    );
     return response.data['viewsCount'] as int;
   }
 
-  Future<List<VideoCommentModel>> getComments(int videoId, {int page = 1, int limit = 20}) async {
+  Future<PaginatedResult<VideoCommentModel>> getComments(
+    int videoId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
     final response = await _dioClient.dio.get(
       ApiEndpoints.videoComments(videoId),
       queryParameters: {'page': page, 'limit': limit},
     );
 
-    final List data = response.data['data'];
-    return data.map((json) => VideoCommentModel.fromJson(json)).toList();
+    return PaginatedResult.fromJson(response.data, VideoCommentModel.fromJson);
   }
 
   Future<VideoCommentModel> addComment(int videoId, String content) async {
@@ -97,7 +104,11 @@ class VideoRepository {
     await _dioClient.dio.delete(ApiEndpoints.videoDelete(videoId));
   }
 
-  Future<VideoModel> updateVideo(int videoId, {String? description, List<String>? tags}) async {
+  Future<VideoModel> updateVideo(
+    int videoId, {
+    String? description,
+    List<String>? tags,
+  }) async {
     final response = await _dioClient.dio.patch(
       ApiEndpoints.videoUpdate(videoId),
       data: {
@@ -107,9 +118,29 @@ class VideoRepository {
     );
     return VideoModel.fromJson(response.data['data']);
   }
-Future<List<VideoModel>> getMyVideos() async {
-  final response = await _dioClient.dio.get(ApiEndpoints.videoMyVideos); 
-  final List data = response.data['data'];
-  return data.map((json) => VideoModel.fromJson(json)).toList();
-}
+
+  Future<PaginatedResult<VideoModel>> getMyVideos({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    final response = await _dioClient.dio.get(
+      ApiEndpoints.videoMyVideos,
+      queryParameters: {'page': page, 'limit': limit},
+    );
+    return PaginatedResult.fromJson(response.data, VideoModel.fromJson);
+  }
+
+  /// Vidéos publiées par un joueur précis (consultable par tout utilisateur
+  /// authentifié, notamment les recruteurs depuis la fiche d'un joueur).
+  Future<PaginatedResult<VideoModel>> getPlayerVideos(
+    int userId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _dioClient.dio.get(
+      ApiEndpoints.videoByPlayer(userId),
+      queryParameters: {'page': page, 'limit': limit},
+    );
+    return PaginatedResult.fromJson(response.data, VideoModel.fromJson);
+  }
 }

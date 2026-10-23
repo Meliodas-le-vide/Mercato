@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:mercato_frontend/core/theme/app_theme.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/onboarding_service.dart';
 
@@ -28,23 +30,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final List<OnboardingItem> _pages = [
     OnboardingItem(
       title: 'Révèle ton talent',
-      description:
-          'Crée ton profil sportif, partage tes meilleures actions et sois repéré par les recruteurs du monde entier.',
-      imagePath: 'assets/images/onboarding1.jpg', // Remplace par ton image
+      description: 'Crée ton profil sportif, partage tes meilleures actions et sois repéré par les recruteurs du monde entier.',
+      imagePath: 'assets/images/onboarding1.jpg',
     ),
     OnboardingItem(
       title: 'Découvre des pépites',
-      description:
-          'Accède à des milliers de CV vidéo et trouve les futurs talents qui intégreront ton club.',
+      description: 'Accède à des milliers de CV vidéo et trouve les futurs talents qui intégreront ton club.',
       imagePath: 'assets/images/onboarding2.jpg',
     ),
     OnboardingItem(
       title: 'Rejoins le réseau',
-      description:
-          'Connecte-toi directement avec les agents, recruteurs et clubs professionnels.',
+      description: 'Connecte-toi directement avec les agents, recruteurs et clubs professionnels.',
       imagePath: 'assets/images/onboarding3.jpg',
     ),
   ];
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   Future<void> _completeOnboarding() async {
     await OnboardingService.setOnboardingCompleted();
@@ -66,9 +71,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // ⚠️ Fond noir volontaire : écran toujours sombre (design premium),
+      // indépendant du thème clair/sombre choisi par l'utilisateur.
+      backgroundColor: AppColors.backgroundDark,
       body: Stack(
         children: [
-          // 1. Carrousel d'images de fond
+          // -------- Images plein écran --------
           PageView.builder(
             controller: _pageController,
             itemCount: _pages.length,
@@ -84,19 +92,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       // Fallback sombre en attendant les vraies images
-                      return Container(color: const Color(0xFF0A0E1A));
+                      return Container(color: AppColors.backgroundDark);
                     },
                   ),
-                  // Overlay sombre en dégradé pour la lisibilité
+                  // Overlay sombre en dégradé pour la lisibilité du texte
+                  // (reste sombre quel que soit le thème : c'est posé sur image)
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.black.withOpacity(0.3),
-                          Colors.black.withOpacity(0.7),
-                          const Color(0xFF0A0E1A),
+                          Colors.black.withValues(alpha: 0.3),
+                          Colors.black.withValues(alpha: 0.7),
+                          AppColors.backgroundDark,
                         ],
                         stops: const [0.0, 0.5, 0.85],
                       ),
@@ -107,14 +116,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             },
           ),
 
-          // 2. Contenu textuel et contrôles
+          // -------- Contenu textuel + contrôles --------
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // Textes dynamiques
+                  // Textes animés au changement de page
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
                     child: Column(
@@ -123,9 +132,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         Text(
                           _pages[_currentIndex].title,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: context.weight(FontWeight.bold),
                             color: Colors.white,
                           ),
                         ),
@@ -135,9 +144,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           child: Text(
                             _pages[_currentIndex].description,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Colors.white70,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white.withValues(alpha: 0.7),
                               height: 1.4,
                             ),
                           ),
@@ -148,7 +157,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                   const SizedBox(height: 28),
 
-                  // Indicateurs de page (Dots)
+                  // Indicateurs de page
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(
@@ -160,8 +169,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         width: _currentIndex == index ? 24 : 6,
                         decoration: BoxDecoration(
                           color: _currentIndex == index
-                              ? AppColors.primaryNeon
-                              : Colors.white24,
+                              ? AppColors.primaryYellow
+                              : Colors.white.withValues(alpha: 0.24),
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -170,14 +179,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                   const SizedBox(height: 28),
 
-                  // Bouton Suivant / Commencer
+                  // Bouton principal
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _nextPage,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryNeon,
-                        foregroundColor: Colors.black,
+                        backgroundColor: AppColors.primaryYellow,
+                        foregroundColor: AppColors.onGold,
                         padding: const EdgeInsets.all(16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -190,8 +199,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             _currentIndex == _pages.length - 1
                                 ? 'Commencer'
                                 : 'Suivant',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
+                            style: TextStyle(
+                              fontWeight: context.weight(FontWeight.bold),
                               fontSize: 15,
                             ),
                           ),
@@ -204,14 +213,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                   const SizedBox(height: 12),
 
-                  // Bouton Passer l'introduction
+                  // Bouton "Passer"
                   TextButton(
                     onPressed: _completeOnboarding,
-                    child: const Text(
+                    child: Text(
                       'Passer l\'introduction',
                       style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.54),
+                        fontSize: 13,
                       ),
                     ),
                   ),

@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
-exports.verifyToken = (req, res, next) => {
+exports.verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -11,7 +12,23 @@ exports.verifyToken = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; 
+    req.user = decoded;
+
+    // Vérifié à chaque requête (et pas seulement au login) pour qu'un
+    // bannissement prononcé par un admin coupe l'accès immédiatement, sans
+    // attendre l'expiration du token déjà émis.
+    const account = await User.findByPk(decoded.userId, { attributes: ['isBanned', 'bannedReason'] });
+    if (!account) {
+      return res.status(401).json({ message: 'Compte introuvable.' });
+    }
+    if (account.isBanned) {
+      return res.status(403).json({
+        message: account.bannedReason
+          ? `Compte suspendu : ${account.bannedReason}`
+          : 'Ce compte a été suspendu.',
+      });
+    }
+
     next();
   } catch (error) {
     return res.status(401).json({ message: 'Token invalide ou expiré.' });

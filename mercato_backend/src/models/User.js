@@ -25,7 +25,10 @@ const User = sequelize.define('User', {
     unique: true,
     validate: {
       isEmail: true
-    }
+    },
+      set(value) {
+        this.setDataValue('email', value?.toLowerCase().trim());
+      },
   },
   password: {
     type: DataTypes.STRING(255),
@@ -60,6 +63,35 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING(255),
     allowNull: true
   },
+
+  isBanned: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
+
+  bannedReason: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+  },
+
+  // ---- Réinitialisation du mot de passe (code à 6 chiffres, haché) ----
+  resetPasswordCode: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+  },
+
+  resetPasswordExpires: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+
+  resetPasswordAttempts: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  },
+
 }, {
   tableName: 'users',
   timestamps: true

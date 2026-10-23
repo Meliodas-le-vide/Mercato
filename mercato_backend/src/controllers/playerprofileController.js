@@ -1,5 +1,6 @@
-const { PlayerProfile, User, Video, VideoLike, VideoComment, Favorite, sequelize} = require('../models/index');
+const { PlayerProfile, User, Video, VideoLike, VideoComment, Favorite, sequelize } = require('../models/index');
 const cloudinary = require('../../config/cloudinary');
+const { Op, Sequelize } = require('sequelize');
 
 const ALLOWED_PROFILE_FIELDS = [
   'position', 'strongFoot', 'birthDate', 'level', 'currentClub',
@@ -8,6 +9,8 @@ const ALLOWED_PROFILE_FIELDS = [
 
 const ALLOWED_STATS_FIELDS = ['goals', 'assists', 'matchesPlayed', 'cardsYellow', 'cardsRed'];
 
+const USER_ALIAS = 'user';
+
 /**
  * GET /api/v1/players/me
  */
@@ -15,7 +18,13 @@ exports.getMe = async (req, res) => {
   try {
     const profile = await PlayerProfile.findOne({
       where: { userId: req.user.userId },
-      include: [{ model: User, attributes: { exclude: ['password', 'refreshToken'] } }],
+      include: [
+        {
+          model: User,
+          as: USER_ALIAS, // alias obligatoire
+          attributes: { exclude: ['password', 'refreshToken'] },
+        },
+      ],
     });
 
     if (!profile) {
@@ -37,7 +46,6 @@ exports.updateMe = async (req, res) => {
     let profile = await PlayerProfile.findOne({ where: { userId: req.user.userId } });
 
     if (!profile) {
-      // Crée le profil s'il n'existe pas encore (premier remplissage après inscription)
       profile = await PlayerProfile.create({ userId: req.user.userId });
     }
 
@@ -47,16 +55,12 @@ exports.updateMe = async (req, res) => {
       }
     }
 
-    // Marque le profil comme complet si les champs essentiels sont remplis
     profile.isProfileComplete = Boolean(
       profile.position && profile.level && profile.birthDate && profile.city
     );
 
     await profile.save();
 
-    // Un simple utilisateur ("fan") qui termine son profil joueur devient
-    // officiellement joueur. On ne touche jamais RECRUITER/CLUB_AGENT/ADMIN :
-    // seul un compte USER peut être promu de cette façon.
     const user = await User.findByPk(req.user.userId);
     if (profile.isProfileComplete && user.role === 'USER') {
       user.role = 'PLAYER';
@@ -181,7 +185,6 @@ exports.updateStats = async (req, res) => {
 
 /**
  * GET /api/v1/players/me/analytics
- * Vue d'ensemble de la performance des vidéos du joueur
  */
 exports.getAnalytics = async (req, res) => {
   try {
@@ -205,7 +208,9 @@ exports.getAnalytics = async (req, res) => {
       data: {
         videosCount: videos.length,
         ...totals,
-        topVideo: topVideo ? { id: topVideo.id, title: topVideo.title, viewsCount: topVideo.viewsCount } : null,
+        topVideo: topVideo
+          ? { id: topVideo.id, title: topVideo.title, viewsCount: topVideo.viewsCount }
+          : null,
       },
     });
   } catch (error) {
@@ -214,17 +219,8 @@ exports.getAnalytics = async (req, res) => {
   }
 };
 
-
-const { Op, Sequelize } = require('sequelize');
 /**
  * GET /api/v1/players/search
- * Query params: q, position, level, city, country, minAge, maxAge,
- *               minHeight, maxHeight, minWeight, maxWeight, page, limit
- *
- * - Sans aucun filtre : retourne tous les joueurs complets, en ordre aléatoire.
- * - Chaque filtre avancé (position, level, city, country, age, height, weight)
- *   est indépendant et combiné en AND avec les autres.
- * - `q` (barre de recherche unique) cherche dans prénom OU nom OU poste (OR interne).
  */
 exports.searchPlayers = async (req, res) => {
   try {
@@ -281,6 +277,7 @@ exports.searchPlayers = async (req, res) => {
     }
 
     // Barre de recherche unique : prénom OU nom OU poste
+    // On utilise l'alias ('user') et non le nom du modèle ('User')
     let includeRequired = false;
     if (q && q.trim() !== '') {
       const searchTerm = `%${q.trim()}%`;
@@ -289,18 +286,14 @@ exports.searchPlayers = async (req, res) => {
         {
           [Op.or]: [
             { position: { [Op.like]: searchTerm } },
-            { '$User.firstname$': { [Op.like]: searchTerm } },
-            { '$User.lastname$': { [Op.like]: searchTerm } },
+            { '$user.firstname$': { [Op.like]: searchTerm } }, 
+            { '$user.lastname$': { [Op.like]: searchTerm } }, 
           ],
         },
       ];
     }
 
-    // Tri aléatoire, compatible MySQL et PostgreSQL.
-    // Avec un `seed` (fourni par le client, stable le temps d'une session de
-    // recherche/pagination), RAND(seed) renvoie le même ordre à chaque page :
-    // sans ça, paginer un tri aléatoire ferait apparaître des doublons et
-    // sauterait des résultats d'une page à l'autre.
+    // Tri aléatoire, compatible MySQL et PostgreSQL
     const dialect = sequelize.getDialect();
     const seed = parseInt(req.query.seed, 10);
     const hasSeed = !Number.isNaN(seed);
@@ -314,6 +307,7 @@ exports.searchPlayers = async (req, res) => {
       include: [
         {
           model: User,
+          as: USER_ALIAS, 
           required: includeRequired,
           attributes: ['id', 'firstname', 'lastname', 'Profile_image'],
         },
@@ -353,12 +347,13 @@ exports.searchPlayers = async (req, res) => {
       cardsYellow: profile.cardsYellow || 0,
       cardsRed: profile.cardsRed || 0,
       isProfileComplete: profile.isProfileComplete,
-      User: profile.User
+      //  On lit profile.user (alias Sequelize) mais on garde la clé JSON "User"
+      User: profile.user
         ? {
-            id: profile.User.id,
-            firstname: profile.User.firstname,
-            lastname: profile.User.lastname,
-            Profile_image: profile.User.Profile_image,
+            id: profile.user.id,
+            firstname: profile.user.firstname,
+            lastname: profile.user.lastname,
+            Profile_image: profile.user.Profile_image,
           }
         : {},
       isFavorited: favoriteIds.has(profile.userId),
@@ -366,10 +361,85 @@ exports.searchPlayers = async (req, res) => {
 
     return res.status(200).json({
       data,
-      pagination: { total: count, page, limit, totalPages: Math.ceil(count / limit) },
+      pagination: {
+        total: count,
+        page,
+        limit,
+        totalPages: Math.ceil(count / limit),
+      },
     });
   } catch (error) {
     console.error('Erreur searchPlayers:', error);
     return res.status(500).json({ error: 'Erreur serveur lors de la recherche.' });
+  }
+};
+
+/**
+ * GET /api/v1/players/:userId
+ */
+exports.getPlayerById = async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (Number.isNaN(userId)) {
+      return res.status(400).json({ error: 'Identifiant invalide.' });
+    }
+
+    const profile = await PlayerProfile.findOne({
+      where: { userId, isProfileComplete: true },
+      include: [
+        {
+          model: User,
+          as: USER_ALIAS, // alias obligatoire
+          attributes: ['id', 'firstname', 'lastname', 'Profile_image'],
+        },
+      ],
+    });
+
+    if (!profile) {
+      return res.status(404).json({ error: 'Profil joueur introuvable.' });
+    }
+
+    let isFavorited = false;
+    if (req.user && req.user.userId) {
+      const favorite = await Favorite.findOne({
+        where: { userId: req.user.userId, playerId: profile.userId },
+      });
+      isFavorited = Boolean(favorite);
+    }
+
+    const data = {
+      id: profile.id,
+      userId: profile.userId,
+      position: profile.position,
+      strongFoot: profile.strongFoot,
+      birthDate: profile.birthDate,
+      level: profile.level,
+      currentClub: profile.currentClub,
+      city: profile.city,
+      country: profile.country,
+      bio: profile.bio,
+      height: profile.height,
+      weight: profile.weight,
+      goals: profile.goals || 0,
+      assists: profile.assists || 0,
+      matchesPlayed: profile.matchesPlayed || 0,
+      cardsYellow: profile.cardsYellow || 0,
+      cardsRed: profile.cardsRed || 0,
+      isProfileComplete: profile.isProfileComplete,
+      User: profile.user
+        ? {
+            id: profile.user.id,
+            firstname: profile.user.firstname,
+            lastname: profile.user.lastname,
+            Profile_image: profile.user.Profile_image,
+          }
+        : {},
+      isFavorited,
+    };
+
+    return res.status(200).json({ data });
+  } catch (error) {
+    console.error('Erreur getPlayerById:', error);
+    return res.status(500).json({ error: 'Erreur serveur.' });
   }
 };

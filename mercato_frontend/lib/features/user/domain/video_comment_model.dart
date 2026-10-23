@@ -20,7 +20,9 @@ class VideoCommentModel {
       id: json['id'],
       videoId: json['videoId'],
       content: json['content'] ?? '',
-      author: json['author'] != null ? UserModel.fromJson(json['author']) : null,
+      author: json['author'] != null
+          ? UserModel.fromJson(json['author'])
+          : null,
       createdAt: json['createdAt'] ?? '',
     );
   }

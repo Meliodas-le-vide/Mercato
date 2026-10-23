@@ -1,8 +1,15 @@
 import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:mercato_frontend/core/widgets/app_snackbar.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mercato_frontend/core/constants/app_colors.dart';
 import 'package:mercato_frontend/core/network/dio_client.dart';
+import 'package:mercato_frontend/core/theme/app_theme.dart';
+import 'package:mercato_frontend/core/widgets/app_loader.dart';
+import 'package:mercato_frontend/core/widgets/app_text_field.dart';
+import 'package:mercato_frontend/core/widgets/gold_button.dart';
 import 'package:mercato_frontend/features/user/data/video_repository.dart';
 
 class PlayerUploadScreen extends StatefulWidget {
@@ -13,9 +20,6 @@ class PlayerUploadScreen extends StatefulWidget {
 }
 
 class _PlayerUploadScreenState extends State<PlayerUploadScreen> {
-  static const Color primaryYellow = Color(0xFFFFD600);
-  static const Color darkBlue = Color(0xFF0F2137);
-
   final _formKey = GlobalKey<FormState>();
   late final VideoRepository _videoRepository;
 
@@ -27,8 +31,14 @@ class _PlayerUploadScreenState extends State<PlayerUploadScreen> {
   File? _selectedVideo;
   bool _isUploading = false;
   double _uploadProgress = 0.0;
+  bool _pickerPressed = false;
 
-  final List<String> _categories = ['HIGHLIGHT', 'MATCH EN ENTIER', 'ANALYSE', 'ENTRAÎNEMENT'];
+  final List<String> _categories = [
+    'HIGHLIGHT',
+    'MATCH EN ENTIER',
+    'ANALYSE',
+    'ENTRAÎNEMENT',
+  ];
 
   @override
   void initState() {
@@ -36,10 +46,18 @@ class _PlayerUploadScreenState extends State<PlayerUploadScreen> {
     _videoRepository = VideoRepository(DioClient());
   }
 
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _tagsController.dispose();
+    super.dispose();
+  }
+
   Future<void> _pickVideo() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickVideo(source: ImageSource.gallery);
-    if (pickedFile != null) {
+    if (pickedFile != null && mounted) {
       setState(() {
         _selectedVideo = File(pickedFile.path);
       });
@@ -50,11 +68,9 @@ class _PlayerUploadScreenState extends State<PlayerUploadScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedVideo == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner une vidéo à publier.'),
-          backgroundColor: Colors.redAccent,
-        ),
+      _showSnackBar(
+        message: 'Veuillez sélectionner une vidéo à publier.',
+        isError: true,
       );
       return;
     }
@@ -65,7 +81,9 @@ class _PlayerUploadScreenState extends State<PlayerUploadScreen> {
     });
 
     try {
-      List<String> tagsList = [_selectedCategory.toLowerCase().replaceAll(' ', '_')];
+      List<String> tagsList = [
+        _selectedCategory.toLowerCase().replaceAll(' ', '_'),
+      ];
 
       if (_tagsController.text.trim().isNotEmpty) {
         final customTags = _tagsController.text
@@ -93,12 +111,7 @@ class _PlayerUploadScreenState extends State<PlayerUploadScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vidéo publiée avec succès !'),
-          backgroundColor: darkBlue,
-        ),
-      );
+      _showSnackBar(message: 'Vidéo publiée avec succès !', isError: false);
 
       Navigator.pop(context, true);
     } catch (e) {
@@ -109,12 +122,7 @@ class _PlayerUploadScreenState extends State<PlayerUploadScreen> {
         errorMessage = e.response?.data['message'] ?? errorMessage;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      _showSnackBar(message: errorMessage, isError: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -124,269 +132,353 @@ class _PlayerUploadScreenState extends State<PlayerUploadScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _tagsController.dispose();
-    super.dispose();
+  void _showSnackBar({required String message, required bool isError}) {
+    if (isError) {
+      AppSnackbar.error(context, message);
+    } else {
+      AppSnackbar.success(context, message);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: darkBlue,
+        automaticallyImplyLeading: false,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        backgroundColor: colors.surface,
+        titleSpacing: 12,
+        toolbarHeight: 64,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, color: colors.icon, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'PUBLIER UNE VIDÉO',
+        title: Text(
+          'Publier une vidéo',
           style: TextStyle(
-            color: primaryYellow,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.1,
+            color: colors.textPrimary,
+            fontSize: 20,
+            fontWeight: context.weight(FontWeight.w700),
+            letterSpacing: -0.3,
           ),
         ),
-        centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+      body: SafeArea(
+        top: false,
         child: Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Sélecteur de vidéo
-              GestureDetector(
-                onTap: _isUploading ? null : _pickVideo,
-                child: Container(
-                  height: 180,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: _selectedVideo != null ? darkBlue : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _selectedVideo != null ? primaryYellow : Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: _selectedVideo != null
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.check_circle_rounded, color: primaryYellow, size: 48),
-                            const SizedBox(height: 8),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                              child: Text(
-                                _selectedVideo!.path.split('/').last,
-                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Cliquer pour modifier',
-                              style: TextStyle(color: primaryYellow, fontSize: 11, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.cloud_upload_outlined, color: darkBlue, size: 48),
-                            SizedBox(height: 12),
-                            Text(
-                              'Sélectionner la vidéo du joueur',
-                              style: TextStyle(color: darkBlue, fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Format MP4, MOV (Max 100 Mo)',
-                              style: TextStyle(color: Colors.grey, fontSize: 11),
-                            ),
-                          ],
-                        ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _VideoPicker(
+                  file: _selectedVideo,
+                  isDisabled: _isUploading,
+                  isPressed: _pickerPressed,
+                  onTapDown: () => setState(() => _pickerPressed = true),
+                  onTapUp: () => setState(() => _pickerPressed = false),
+                  onTapCancel: () => setState(() => _pickerPressed = false),
+                  onTap: _pickVideo,
                 ),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 28),
 
-              _buildSectionTitle('INFORMATIONS VIDÉO'),
-              const SizedBox(height: 12),
-
-              _buildTextField(
-                controller: _titleController,
-                label: 'Titre de la vidéo',
-                hint: 'ex: SAISON 2025/26 - COMPILATION BUTS',
-                icon: Icons.title,
-                validator: (val) => val == null || val.trim().isEmpty ? 'Champ requis' : null,
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
-                controller: _descriptionController,
-                label: 'Description',
-                hint: 'Décris brièvement les détails ou le contexte...',
-                icon: Icons.description_outlined,
-                maxLines: 3,
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
-                controller: _tagsController,
-                label: 'Mots-clés / Tags (séparés par des virgules)',
-                hint: 'ex: dribble, vitesse, coup_franc',
-                icon: Icons.local_offer_outlined,
-              ),
-              const SizedBox(height: 16),
-
-              const Text(
-                'Catégorie',
-                style: TextStyle(color: darkBlue, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _categories.map((cat) {
-                  final isSelected = _selectedCategory == cat;
-                  return ChoiceChip(
-                    label: Text(
-                      cat,
-                      style: TextStyle(
-                        color: isSelected ? primaryYellow : darkBlue,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    selected: isSelected,
-                    selectedColor: darkBlue,
-                    backgroundColor: Colors.grey.shade100,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      side: BorderSide(
-                        color: isSelected ? darkBlue : Colors.grey.shade300,
-                      ),
-                    ),
-                    onSelected: (selected) {
-                      if (selected) setState(() => _selectedCategory = cat);
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 32),
-
-              if (_isUploading) ...[
-                LinearProgressIndicator(
-                  value: _uploadProgress > 0 ? _uploadProgress : null,
-                  backgroundColor: Colors.grey.shade200,
-                  color: darkBlue,
-                ),
-                const SizedBox(height: 8),
-                Center(
-                  child: Text(
-                    'Envoi en cours... ${(_uploadProgress * 100).toStringAsFixed(0)}%',
-                    style: const TextStyle(color: darkBlue, fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
+                AppTextField(
+                  controller: _titleController,
+                  label: 'Titre',
+                  hint: 'Ex : Compilation buts saison 2025/26',
+                  icon: Icons.title_rounded,
+                  required: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  validator: (val) =>
+                      val == null || val.trim().isEmpty ? 'Champ requis' : null,
                 ),
                 const SizedBox(height: 16),
-              ],
-
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isUploading ? null : _submitData,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: darkBlue,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _isUploading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: primaryYellow, strokeWidth: 2.5),
-                        )
-                      : const Text(
-                          'PUBLIER DANS LE MERCATO',
-                          style: TextStyle(
-                            color: primaryYellow,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 14,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
+                AppTextField(
+                  controller: _descriptionController,
+                  label: 'Description',
+                  hint: 'Décris brièvement le contexte…',
+                  required: true,
+                  maxLines: 4,
+                  textCapitalization: TextCapitalization.sentences,
+                  validator: (val) =>
+                      val == null || val.trim().isEmpty ? 'Champ requis' : null,
                 ),
-              ),
-              const SizedBox(height: 20),
-            ],
+                const SizedBox(height: 16),
+                _CategoryField(
+                  categories: _categories,
+                  selected: _selectedCategory,
+                  onChanged: (cat) => setState(() => _selectedCategory = cat),
+                ),
+                const SizedBox(height: 16),
+                AppTextField(
+                  controller: _tagsController,
+                  label: 'Mots-clés (séparés par des virgules)',
+                  hint: 'dribble, vitesse, coup franc',
+                  icon: Icons.tag_rounded,
+                ),
+                const SizedBox(height: 32),
+
+                if (_isUploading) ...[
+                  _UploadProgress(progress: _uploadProgress),
+                  const SizedBox(height: 20),
+                ],
+
+                GoldButton(
+                  height: 52,
+                  width: double.infinity,
+                  fontSize: 15,
+                  label: 'Publier la vidéo',
+                  icon: Icons.cloud_upload_outlined,
+                  loading: _isUploading,
+                  onPressed: _isUploading ? null : _submitData,
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        color: darkBlue,
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 1.2,
+class _VideoPicker extends StatelessWidget {
+  final File? file;
+  final bool isDisabled;
+  final bool isPressed;
+  final VoidCallback onTapDown;
+  final VoidCallback onTapUp;
+  final VoidCallback onTapCancel;
+  final VoidCallback onTap;
+
+  const _VideoPicker({
+    required this.file,
+    required this.isDisabled,
+    required this.isPressed,
+    required this.onTapDown,
+    required this.onTapUp,
+    required this.onTapCancel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final hasFile = file != null;
+
+    return GestureDetector(
+      onTap: isDisabled ? null : onTap,
+      onTapDown: isDisabled ? null : (_) => onTapDown(),
+      onTapUp: isDisabled ? null : (_) => onTapUp(),
+      onTapCancel: isDisabled ? null : onTapCancel,
+      child: AnimatedScale(
+        scale: isPressed ? 0.98 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: Container(
+          height: 160,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: colors.surfaceVariant,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: hasFile ? AppColors.accentOrange : colors.border,
+              width: hasFile ? 1.5 : 1,
+            ),
+          ),
+          child: hasFile
+              ? _buildSelected(context, colors)
+              : _buildEmpty(context, colors),
+        ),
       ),
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    TextInputType keyboardType = TextInputType.text,
-    int maxLines = 1,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      maxLines: maxLines,
-      validator: validator,
-      style: const TextStyle(color: darkBlue, fontSize: 13),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Colors.black45, fontSize: 12),
-        hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12),
-        prefixIcon: Icon(icon, color: darkBlue, size: 20),
-        filled: true,
-        fillColor: Colors.grey.shade100,
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+  Widget _buildEmpty(BuildContext context, AppSemanticColors colors) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: colors.surface,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.cloud_upload_outlined,
+            color: colors.iconMuted,
+            size: 24,
+          ),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: darkBlue, width: 1.5),
+        const SizedBox(height: 12),
+        Text(
+          'Sélectionner une vidéo',
+          style: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 14,
+            fontWeight: context.weight(FontWeight.w600),
+          ),
         ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.redAccent),
+        const SizedBox(height: 3),
+        Text(
+          'MP4, MOV · Max 100 Mo',
+          style: TextStyle(color: colors.textTertiary, fontSize: 12),
         ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
-        ),
+      ],
+    );
+  }
+
+  Widget _buildSelected(BuildContext context, AppSemanticColors colors) {
+    final fileName = file!.path.split('/').last;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.check_circle_rounded,
+            color: AppColors.accentOrange,
+            size: 36,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            fileName,
+            style: TextStyle(
+              color: colors.textPrimary,
+              fontSize: 13,
+              fontWeight: context.weight(FontWeight.w600),
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Appuyer pour modifier',
+            style: TextStyle(
+              color: AppColors.accentOrange,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+class _CategoryField extends StatelessWidget {
+  final List<String> categories;
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  const _CategoryField({
+    required this.categories,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Catégorie',
+          style: TextStyle(
+            color: colors.textSecondary,
+            fontSize: 13,
+            fontWeight: context.weight(FontWeight.w600),
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: selected,
+          dropdownColor: colors.surface,
+          borderRadius: BorderRadius.circular(12),
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: colors.iconMuted,
+          ),
+          style: TextStyle(color: colors.textPrimary, fontSize: 15),
+          decoration: InputDecoration(
+            prefixIcon: Icon(
+              Icons.category_outlined,
+              size: 20,
+              color: colors.iconMuted,
+            ),
+          ),
+          items: [
+            for (final cat in categories)
+              DropdownMenuItem(value: cat, child: Text(cat)),
+          ],
+          onChanged: (value) {
+            if (value != null) onChanged(value);
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _UploadProgress extends StatelessWidget {
+  final double progress;
+
+  const _UploadProgress({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final percentage = (progress * 100).toStringAsFixed(0);
+
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: SizedBox(
+            height: 6,
+            child: Stack(
+              children: [
+                Container(color: colors.surfaceVariant),
+                FractionallySizedBox(
+                  widthFactor: progress.clamp(0.0, 1.0),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: AppColors.accentOrange,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(width: 14, height: 14, child: AppLoader(size: 14)),
+            const SizedBox(width: 8),
+            Text(
+              'Envoi en cours… $percentage %',
+              style: TextStyle(
+                color: colors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

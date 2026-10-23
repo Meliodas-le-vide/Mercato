@@ -3,7 +3,7 @@ class PlayerProfileModel {
   final int userId;
   final String? position;
   final String? strongFoot;
-  final String? birthDate; 
+  final String? birthDate;
   final String? level;
   final String? currentClub;
   final String? city;

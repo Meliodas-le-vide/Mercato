@@ -10,7 +10,7 @@ const Video = sequelize.define('Video', {
   },
 
   userId: {
-    // Le joueur qui a publié la vidéo
+
     type: DataTypes.INTEGER,
     allowNull: false,
   },
@@ -26,13 +26,13 @@ const Video = sequelize.define('Video', {
   },
 
   tags: {
-    // ex: ["dribble", "but", "finale"]
+
     type: DataTypes.JSON,
     allowNull: true,
   },
 
   position: {
-    // Poste concerné par l'action montrée dans la vidéo (filtrable dans le feed)
+
     type: DataTypes.ENUM(
       'GARDIEN',
       'DEFENSEUR_CENTRAL',
@@ -63,7 +63,7 @@ const Video = sequelize.define('Video', {
     allowNull: true,
   },
 
-  // --- Compteurs dénormalisés pour éviter des COUNT() coûteux à chaque lecture du feed ---
+
   viewsCount: {
     type: DataTypes.INTEGER,
     defaultValue: 0,

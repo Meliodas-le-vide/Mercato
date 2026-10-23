@@ -22,14 +22,17 @@ class UserModel {
   /// Getter qui garantit le renvoi d'une URL HTTP/HTTPS complète
   String? get fullProfileImageUrl {
     if (Profile_image == null || Profile_image!.trim().isEmpty) return null;
-    
+
     // Si c'est déjà une URL web distante (Cloudinary, S3, etc.)
-    if (Profile_image!.startsWith('http://') || Profile_image!.startsWith('https://')) {
+    if (Profile_image!.startsWith('http://') ||
+        Profile_image!.startsWith('https://')) {
       return Profile_image;
     }
-    
+
     // Si c'est un chemin relatif envoyé par Express/Multer
-    final cleanPath = Profile_image!.startsWith('/') ? Profile_image! : '/$Profile_image';
+    final cleanPath = Profile_image!.startsWith('/')
+        ? Profile_image!
+        : '/$Profile_image';
     return '${ApiEndpoints.baseUrl}$cleanPath';
   }
 
@@ -41,7 +44,8 @@ class UserModel {
       email: json['email'] ?? '',
       phone: json['phone']?.toString(),
       role: json['role'] ?? 'USER',
-      Profile_image: json['Profile_image'] ?? json['ProfileImage'] ?? json['profileImage'],
+      Profile_image:
+          json['Profile_image'] ?? json['ProfileImage'] ?? json['profileImage'],
     );
   }
 

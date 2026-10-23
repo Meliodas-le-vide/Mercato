@@ -1,60 +1,45 @@
 import 'package:flutter/material.dart';
 
-// class AppColors {
- 
-//   static const Color primaryNeon = Color.fromARGB(255, 230, 46, 0); 
-//   static const Color backgroundDark = Color(0xFF121212); 
-//   static const Color surfaceDark = Color(0xFF1E1E1E); 
-//   static const Color surfaceLight = Color(0xFF2C2C2C); 
-
-
-//   static const Color textPrimary = Color(0xFFFFFFFF);
-//   static const Color textSecondary = Color(0xFFA0A0A0);
-//   static const Color textDisabled = Color(0xFF666666);
-
-
-//   static const Color verifiedBadge = Color(0xFF2196F3); 
-//   static const Color error = Color(0xFFFF5252);
-//   static const Color warning = Color(0xFFFFB74D);
-//   static const Color success = Color(0xFF00E676);
-// }
-
-
-
-// class AppColors {
- 
-//   static const Color primaryNeon = Color(0xFF00F0FF); // Cyan néon
-//   static const Color backgroundDark = Color(0xFF0B0F19);
-//   static const Color surfaceDark = Color(0xFF151C2C);
-//   static const Color surfaceLight = Color(0xFF222D45);
-
-
-//   static const Color textPrimary = Color(0xFFFFFFFF);
-//   static const Color textSecondary = Color(0xFF8E9BAE);
-//   static const Color textDisabled = Color(0xFF525E75);
-
-//   static const Color verifiedBadge = Color(0xFF00F0FF);
-//   static const Color error = Color(0xFFFF4D4D);
-//   static const Color warning = Color(0xFFFFB74D);
-//   static const Color success = Color(0xFF00E676);
-// }
-
-
 class AppColors {
- 
-  static const Color primaryNeon = Color(0xFFFFD700); 
-  static const Color backgroundDark = Color(0xFF0C0C0E); 
-  static const Color surfaceDark = Color(0xFF17171C); 
-  static const Color surfaceLight = Color(0xFF26262E); 
-
-
-  static const Color textPrimary = Color(0xFFFFFFFF);
-  static const Color textSecondary = Color(0xFFA1A1AA);
-  static const Color textDisabled = Color(0xFF52525B);
-
-  static const Color verifiedBadge = Color(0xFF38BDF8); 
+  static const Color primaryYellow = Color(0xFFFFC107);
+  static const Color accentOrange = Color(0xFFFF6F00);
+  static const Color onGold = Color(0xFF1A1200);
   static const Color error = Color(0xFFEF4444);
   static const Color warning = Color(0xFFF59E0B);
   static const Color success = Color(0xFF10B981);
-}
+  static const Color verifiedBadge = Color(0xFF38BDF8);
 
+  static const List<Color> goldGradient = [
+    Color(0xFFFFE57F),
+    Color(0xFFFFC107),
+    Color(0xFFFF6F00),
+  ];
+  static const List<double> goldGradientStops = [0.0, 0.5, 1.0];
+
+  static const Color backgroundDark = Color(0xFF0F1015);
+  static const Color surfaceDark = Color(0xFF1A1C23);
+  static const Color surfaceVariantDark = Color(0xFF23262F);
+  static const Color textPrimaryDark = Color(0xFFF9FAFB);
+  static const Color textSecondaryDark = Color(0xFF9CA3AF);
+  static const Color textTertiaryDark = Color(0xFF6B7280);
+  static const Color iconDark = Color(0xFFE5E7EB);
+  static const Color iconMutedDark = Color(0xFF9CA3AF);
+  static const Color dividerDark = Color(0xFF2A2D36);
+  static const Color borderDark = Color(0x1FFFFFFF);
+  static const Color shadowDark = Color(0xFF000000);
+  static const Color navUnselectedDark = Color(0xFF9CA3AF);
+
+  static const Color backgroundLight = Color(0xFFF3F4F6);
+  static const Color surfaceLight = Color(0xFFF4F4F4);
+  static const Color surfaceVariantLight = Color(0xFFF9FAFB);
+  static const Color textPrimaryLight = Color(0xFF111827);
+  static const Color textSecondaryLight = Color(0xFF6B7280);
+  static const Color textTertiaryLight = Color(0xFF9CA3AF);
+  static const Color iconLight = Color(0xFF1F2937);
+  static const Color iconMutedLight = Color(0xFF6B7280);
+  static const Color dividerLight = Color(0xFFE5E7EB);
+  static const Color borderLight = Color(0xFFE5E7EB);
+  static const Color shadowLight = Color(0x14000000);
+  static const Color navUnselectedLight = Color(0xFF6B7280);
+  static const Color navBorderLight = Color(0xFFCBD5E1);
+}

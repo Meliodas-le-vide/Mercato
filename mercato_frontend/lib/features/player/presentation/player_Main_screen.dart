@@ -1,7 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:mercato_frontend/config/routes/app_routes.dart';
-import 'package:mercato_frontend/features/player/presentation/feed_screen.dart';
+import 'dart:convert';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:mercato_frontend/config/routes/app_routes.dart';
+import 'package:mercato_frontend/core/constants/app_colors.dart';
+import 'package:mercato_frontend/core/theme/app_theme.dart';
+import 'package:mercato_frontend/core/widgets/app_bottom_nav.dart';
+import 'package:mercato_frontend/core/widgets/app_loader.dart';
+import 'package:mercato_frontend/features/chat/presentation/conversation_screen.dart';
+import 'package:mercato_frontend/features/events/presentation/event_list_screen.dart';
+import 'package:mercato_frontend/features/player/presentation/feed_screen.dart';
+import 'package:mercato_frontend/features/player/presentation/player_profile_screen.dart';
 
 class PlayerMainScreen extends StatefulWidget {
   const PlayerMainScreen({super.key});
@@ -11,146 +20,179 @@ class PlayerMainScreen extends StatefulWidget {
 }
 
 class _PlayerMainScreenState extends State<PlayerMainScreen> {
+  final _storage = const FlutterSecureStorage();
+
   int _currentIndex = 0;
+  int? _currentUserId;
+  bool _isLoading = true;
 
-  static const Color primaryYellow = Color(0xFFFFD600);
-  static const Color darkBlue = Color(0xFF0F2137);
+  @override
+  void initState() {
+    super.initState();
+    _loadUserSession();
+  }
 
-  final List<Widget> _pages = [
-    const FeedScreen(),
-    const _PlaceholderEventsScreen(),
-    const _PlaceholderSearchScreen(),
-    const _PlaceholderMessageScreen(),
+  Future<void> _loadUserSession() async {
+    try {
+      final userJson = await _storage.read(key: 'user_data');
+      if (userJson != null) {
+        final userMap = jsonDecode(userJson);
+        final id = userMap['id'] ?? userMap['userId'];
+        if (mounted) {
+          setState(() {
+            _currentUserId = id;
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      debugPrint('Erreur loadUserSession: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  static const _navItems = [
+    AppBottomNavItem(
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
+      label: 'Accueil',
+    ),
+    AppBottomNavItem(
+      icon: Icons.calendar_today_outlined,
+      activeIcon: Icons.calendar_today_rounded,
+      label: 'Événement',
+    ),
+    AppBottomNavItem(
+      icon: Icons.chat_bubble_outline_rounded,
+      activeIcon: Icons.chat_bubble_rounded,
+      label: 'Message',
+    ),
+    AppBottomNavItem(
+      icon: Icons.person_outline_rounded,
+      activeIcon: Icons.person_rounded,
+      label: 'Profil',
+    ),
   ];
 
+  void _onTabTapped(int index) {
+    if (index == _currentIndex) return;
+    setState(() => _currentIndex = index);
+  }
+
+  /// FAB central → ouvrir l'écran de publication de vidéo
+  void _onFabPressed() {
+    Navigator.pushNamed(context, AppRoutes.upload);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    // -------- État de chargement --------
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: colors.background,
+        body: const Center(child: AppLoader()),
+      );
+    }
+
+    // -------- Erreur de session --------
+    if (_currentUserId == null) {
+      return Scaffold(
+        backgroundColor: colors.background,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline_rounded,
+                  size: 40,
+                  color: colors.error,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Session expirée',
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: context.weight(FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Veuillez vous reconnecter pour continuer.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: colors.textSecondary,
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      AppRoutes.login,
+                      (route) => false,
+                    );
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    backgroundColor: colors.surfaceVariant,
+                  ),
+                  child: Text(
+                    'Se reconnecter',
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: context.weight(FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // -------- Pages --------
+    final List<Widget> pages = [
+      const FeedScreen(),
+      const EventsListScreen(),
+      ConversationsListScreen(currentUserId: _currentUserId!),
+      const PlayerProfileScreen(),
+    ];
+
     return Scaffold(
-      body: Stack(
-        children: [
-          IndexedStack(
-            index: _currentIndex,
-            children: _pages,
-          ),
+      backgroundColor: colors.background,
+      extendBody: true,
+      body: IndexedStack(index: _currentIndex, children: pages),
+      bottomNavigationBar: AppBottomNav(
+        items: _navItems,
+        currentIndex: _currentIndex,
+        onTap: _onTabTapped,
+        onFabPressed: _onFabPressed,
+        fabIcon: Icons.add_rounded,
 
-          Positioned(
-            right: 20,
-            bottom: 30,
-            child: FloatingActionButton(
-              backgroundColor: primaryYellow,
-              elevation: 4,
-              shape: const CircleBorder(),
-              onPressed: () {
-                Navigator.pushNamed(context, AppRoutes.upload);
-              },
-              child: const Icon(Icons.add, color: darkBlue, size: 35),
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: Container(
-        height: 100,
-        decoration: const BoxDecoration(
-          color: darkBlue,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
+        fabGradient: const LinearGradient(
+          colors: [AppColors.primaryYellow, AppColors.accentOrange],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: SafeArea(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.home,
-                label: 'Home',
-                isSelected: _currentIndex == 0,
-                onTap: () => setState(() => _currentIndex = 0),
-              ),
-              _NavItem(
-                icon: Icons.calendar_month_outlined,
-                label: 'Events',
-                isSelected: _currentIndex == 1,
-                onTap: () => setState(() => _currentIndex = 1),
-              ),
-              _NavItem(
-                icon: Icons.search,
-                label: 'Search',
-                isSelected: _currentIndex == 2,
-                onTap: () => setState(() => _currentIndex = 2),
-              ),
-              _NavItem(
-                icon: Icons.mail_outline,
-                label: 'Message',
-                isSelected: _currentIndex == 3,
-                onTap: () => setState(() => _currentIndex = 3),
-              ),          
-            ],
-          ),
-        ),
+        fabIconColor: AppColors.onGold,
       ),
     );
   }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  static const Color primaryYellow = Color(0xFFFFD600);
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? primaryYellow : Colors.white54,
-            size: 22,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? primaryYellow : Colors.white54,
-              fontSize: 10,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-
-
-class _PlaceholderEventsScreen extends StatelessWidget {
-  const _PlaceholderEventsScreen();
-  @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Events')));
-}
-
-class _PlaceholderSearchScreen extends StatelessWidget {
-  const _PlaceholderSearchScreen();
-  @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Search')));
-}
-
-class _PlaceholderMessageScreen extends StatelessWidget {
-  const _PlaceholderMessageScreen();
-  @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Message')));
 }
